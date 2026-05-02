@@ -1,0 +1,40 @@
+direction: right
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+client: "WackDB CLI / Web UI" {
+  shape: c4-person
+}
+
+engine: "WackDB Engine" {
+  parser: "SQL Parser (wackdb_sql)" { shape: package }
+  catalog: "Catalog (wackdb_catalog)" { shape: package }
+  optimizer: "Query Optimizer (wackdb_query)" { shape: rectangle }
+  
+  executor: "Volcano Executor" {
+    shape: queue
+    seq: "SeqScan"
+    idx: "IndexScan"
+    sort: "ExternalMergeSort"
+    join: "NestedLoopJoin"
+  }
+  
+  bpm: "Buffer Pool Manager (wackdb_buffer)" { shape: rectangle }
+  btree: "B+ Tree Index (wackdb_btree)" { shape: rectangle }
+  
+  disk: "BasicDiskManager (wackdb_storage)" { shape: cylinder }
+  wal: "DiskLogManager (wackdb_wal)" { shape: cylinder }
+}
+
+client -> engine.parser: "SQL String"
+engine.parser -> engine.catalog: "Validate Tables"
+engine.parser -> engine.optimizer: "AST"
+engine.optimizer -> engine.executor: "Execution Plan"
+engine.executor -> engine.bpm: "Request Pages"
+engine.executor -> engine.btree: "Index Lookup / Range Scan"
+engine.btree -> engine.bpm: "Request Node Pages"
+engine.bpm -> engine.disk: "Read/Write 8192b Pages"
+engine.bpm -> engine.wal: "Append Payload / Flush LSN"

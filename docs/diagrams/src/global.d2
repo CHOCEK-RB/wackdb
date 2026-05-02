@@ -1,0 +1,56 @@
+direction: down
+
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+classes: {
+  frontend_layer: {
+    style: { border-radius: 8; stroke-dash: 3 }
+  }
+  ram_layer: {
+    style: { border-radius: 8; stroke-width: 2 }
+  }
+  disk_layer: {
+    style: { border-radius: 8; double-border: true }
+  }
+  crate: {
+    shape: package
+  }
+}
+
+Frontend: {
+  class: frontend_layer
+  wackdb_cli: { class: crate }
+  wackdb_web: { class: crate }
+  wackdb_sql: { class: crate }
+}
+
+Backend RAM: {
+  class: ram_layer
+  wackdb_query: { class: crate }
+  wackdb_catalog: { class: crate }
+  wackdb_buffer: { class: crate }
+  wackdb_page: { class: crate }
+  wackdb_btree: { class: crate }
+  wackdb_tuple: { class: crate }
+}
+
+Backend Disk: {
+  class: disk_layer
+  wackdb_wal: { class: crate }
+  wackdb_storage: { class: crate }
+}
+
+Frontend.wackdb_cli -> Frontend.wackdb_sql: "Parse"
+Frontend.wackdb_web -> Frontend.wackdb_sql: "Parse"
+Frontend.wackdb_sql -> Backend RAM.wackdb_query: "Execute"
+Backend RAM.wackdb_query -> Backend RAM.wackdb_catalog: "Metadata"
+Backend RAM.wackdb_query -> Backend RAM.wackdb_buffer: "Request Pages"
+Backend RAM.wackdb_query -> Backend RAM.wackdb_btree: "Index Scan"
+Backend RAM.wackdb_buffer -> Backend RAM.wackdb_page: "Cast Frames"
+Backend RAM.wackdb_buffer -> Backend RAM.wackdb_tuple: "Tuple Serialization"
+Backend RAM.wackdb_buffer -> Backend Disk.wackdb_storage: "Evict/Fetch Page"
+Backend RAM.wackdb_buffer -> Backend Disk.wackdb_wal: "Append WAL"
