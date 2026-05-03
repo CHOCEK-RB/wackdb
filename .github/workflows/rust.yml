@@ -14,11 +14,14 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    container:
-      image: rust:latest
-
+    
     steps:
     - uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
     
     - uses: taiki-e/install-action@v2
       with:
