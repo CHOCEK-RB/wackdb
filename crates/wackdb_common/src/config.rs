@@ -5,6 +5,7 @@ use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
+    pub data_dir: String,
     pub page_size: usize,
     pub buffer_pool_size: usize,
     pub segment_size: u64,
@@ -14,6 +15,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            data_dir: "data".to_string(),
             page_size: 8192,
             buffer_pool_size: 1024,
             segment_size: 1024 * 1024 * 1024,

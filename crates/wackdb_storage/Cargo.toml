@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+wackdb_common = { path = "../wackdb_common" }
+thiserror = "2.0.18"
+serde = { version =  "1.0.228", features = ["derive"] }
+anyhow = "1.0.102"
+tempfile = "3.27.0"
