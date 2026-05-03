@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 wackdb_common = { path = "../wackdb_common" }
-anyhow = "1.0"
+anyhow = "1.0.102"
