@@ -28,7 +28,7 @@ impl Config {
             bail!("PAGE_SIZE must be greater than 0");
         }
 
-        if self.page_size % 512 != 0 && self.page_size % 4096 != 0 {
+        if !self.page_size.is_multiple_of(512) && self.page_size.is_multiple_of(4096) {
             bail!("PAGE_SIZE must be a multiple of 512 or 4096");
         }
 
