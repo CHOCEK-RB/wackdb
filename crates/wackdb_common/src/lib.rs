@@ -1,5 +1,6 @@
 pub mod config;
 pub mod constants;
+pub mod errors;
 pub mod types;
 
 pub use config::Config;
@@ -9,3 +10,7 @@ pub use constants::{
 pub use types::{
     BufferTag, FrameId, LocalPageId, Lsn, PageId, Rid, SegmentIndex, SlotId, TransactionId,
 };
+
+pub use errors::DatabaseError;
+
+pub type Result<T> = std::result::Result<T, DatabaseError>;
