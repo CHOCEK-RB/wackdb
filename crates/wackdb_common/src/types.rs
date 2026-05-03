@@ -1,6 +1,3 @@
-//! Fundamental data types for wackdb.
-
-/// Unique identifier for a page in the storage system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct PageId(pub u32);
@@ -15,7 +12,6 @@ impl PageId {
     }
 }
 
-/// Unique identifier for a frame in the buffer pool.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct FrameId(pub u32);
@@ -30,7 +26,6 @@ impl FrameId {
     }
 }
 
-/// Unique identifier for a slot within a page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct SlotId(pub u16);
@@ -45,7 +40,6 @@ impl SlotId {
     }
 }
 
-/// Unique identifier for a transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct TransactionId(pub u64);
@@ -60,7 +54,6 @@ impl TransactionId {
     }
 }
 
-/// Log Sequence Number, used for recovery and logging.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct Lsn(pub u64);
@@ -75,7 +68,6 @@ impl Lsn {
     }
 }
 
-/// Record Identifier, uniquely identifies a record's physical location.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(C)]
 pub struct Rid {
@@ -83,7 +75,6 @@ pub struct Rid {
     pub slot_id: SlotId,
 }
 
-/// Buffer Tag, identifies a page within the buffer pool.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(C)]
 pub struct BufferTag {
@@ -91,7 +82,6 @@ pub struct BufferTag {
     pub page_id: PageId,
 }
 
-/// Index of a segment in the architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct SegmentIndex(pub u32);
@@ -106,7 +96,6 @@ impl SegmentIndex {
     }
 }
 
-/// Local page identifier within a segment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct LocalPageId(pub u32);
