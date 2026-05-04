@@ -1,14 +1,31 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+use zerocopy::{FromBytes, Immutable, IntoBytes};
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, IntoBytes, Immutable,
+)]
 #[repr(transparent)]
-pub struct PageId(pub u32);
+pub struct PageId(pub u64);
 
 impl PageId {
-    pub fn to_le_bytes(self) -> [u8; 4] {
+    pub fn new(table_id: u32, page_idx: u32) -> Self {
+        let id = ((table_id as u64) << 32) | (page_idx as u64);
+        Self(id)
+    }
+
+    pub fn table_id(self) -> u32 {
+        (self.0 >> 32) as u32
+    }
+
+    pub fn page_idx(self) -> u32 {
+        (self.0 & 0xFFFF_FFFF) as u32
+    }
+
+    pub fn to_le_bytes(self) -> [u8; 8] {
         self.0.to_le_bytes()
     }
 
-    pub fn from_le_bytes(bytes: [u8; 4]) -> Self {
-        Self(u32::from_le_bytes(bytes))
+    pub fn from_le_bytes(bytes: [u8; 8]) -> Self {
+        Self(u64::from_le_bytes(bytes))
     }
 }
 
@@ -110,13 +127,13 @@ impl LocalPageId {
     }
 }
 
-impl From<u32> for PageId {
-    fn from(id: u32) -> Self {
+impl From<u64> for PageId {
+    fn from(id: u64) -> Self {
         Self(id)
     }
 }
 
-impl From<PageId> for u32 {
+impl From<PageId> for u64 {
     fn from(id: PageId) -> Self {
         id.0
     }

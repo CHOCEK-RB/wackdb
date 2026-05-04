@@ -8,3 +8,4 @@ serde = { version = "1.0.228", features = ["derive"] }
 toml = "1.1.2"
 anyhow = "1.0.102"
 thiserror = "2.0.18"
+zerocopy = { version = "0.8.48", features = ["derive"] }
