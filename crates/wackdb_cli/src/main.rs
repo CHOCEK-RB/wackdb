@@ -15,9 +15,7 @@ fn main() -> Result<()> {
 
     println!("Configuration loaded:");
     println!("  PAGE_SIZE: {}", config.page_size);
-    println!("  BUFFER_POOL_SIZE: {}", config.buffer_pool_size);
-    println!("  SEGMENT_SIZE: {}", config.segment_size);
-    println!("  LRU_CAPACITY: {}", config.lru_capacity);
+    println!("  DATA_DIR: {}", config.data_dir);
 
     Ok(())
 }
