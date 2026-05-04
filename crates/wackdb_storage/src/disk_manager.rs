@@ -71,7 +71,7 @@ impl DiskManager {
         let mut file = self.get_file_handle(table_id)?;
         let file_len = file.metadata()?.len();
 
-        if file_len % PAGE_SIZE as u64 != 0 {
+        if !file_len.is_multiple_of(PAGE_SIZE as u64) {
             return Err(DatabaseError::Storage(format!(
                 "Table file {} is not aligned to PAGE_SIZE (len: {})",
                 table_id, file_len
