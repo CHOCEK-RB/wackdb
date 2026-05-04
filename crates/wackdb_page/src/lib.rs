@@ -88,3 +88,53 @@ impl<'a> SlottedPage<'a> {
         PageHeader::mut_from_bytes(&mut self.buffer[..size_of::<PageHeader>()]).unwrap()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_insertion_algorithm_proof() -> Result<(), DatabaseError> {
+        let mut buffer = [0u8; PAGE_SIZE];
+        let mut page = SlottedPage::new(&mut buffer);
+        page.init();
+
+        assert_eq!(page.header().slot_count, 0);
+
+        let data1 = b"first_tuple";
+        let slot0 = page.insert_tuple(data1)?;
+        assert_eq!(slot0, 0);
+        assert_eq!(page.get_tuple(slot0).unwrap(), data1);
+
+        assert_eq!(page.header().slot_count, 1);
+        assert_eq!(
+            page.header().lower,
+            (size_of::<PageHeader>() + size_of::<ItemId>()) as u16
+        );
+
+        let data2 = b"second";
+        let slot1 = page.insert_tuple(data2)?;
+        assert_eq!(slot1, 1);
+        assert_eq!(page.get_tuple(slot0).unwrap(), data1);
+        assert_eq!(page.get_tuple(slot1).unwrap(), data2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_page_full_error_handling() -> Result<(), DatabaseError> {
+        let mut buffer = [0u8; PAGE_SIZE];
+        let mut page = SlottedPage::new(&mut buffer);
+        page.init();
+
+        let max_data_size = PAGE_SIZE - size_of::<PageHeader>() - size_of::<ItemId>();
+
+        let large_data = vec![0u8; max_data_size];
+        page.insert_tuple(&large_data)?;
+
+        let result = page.insert_tuple(b"A");
+        assert!(result.is_err());
+
+        Ok(())
+    }
+}
