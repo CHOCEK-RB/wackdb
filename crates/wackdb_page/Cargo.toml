@@ -4,4 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+wackdb_common = { version = "0.1.0", path = "../wackdb_common" }
 zerocopy = { version = "0.8.48", features = ["derive"] }
