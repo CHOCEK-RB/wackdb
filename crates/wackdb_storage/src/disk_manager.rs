@@ -8,18 +8,14 @@ use wackdb_common::constants::PAGE_SIZE;
 use wackdb_common::errors::DatabaseError;
 use wackdb_common::types::PageId;
 
-/// DiskManager manages the physical persistence of fixed-size 8KB pages.
-///
-/// It provides basic I/O operations and guarantees atomicity during page updates
-/// by employing a temporary file swap (Shadow Paging) strategy combined with
-/// explicit filesystem synchronization.
+/// DiskManager manages the physical persistence of fixed-size pages
 pub struct DiskManager {
     data_dir: PathBuf,
     opened_files: HashMap<u32, File>,
 }
 
 impl DiskManager {
-    /// Initializes the DiskManager and ensures the data directory exists.
+    /// Initializes the DiskManager and ensures the data directory exists
     pub fn new(config: &Config) -> Result<Self, DatabaseError> {
         let data_dir = PathBuf::from(&config.data_dir);
         if !data_dir.exists() {
@@ -32,7 +28,7 @@ impl DiskManager {
         })
     }
 
-    /// Creates a new database file for the specified table ID.
+    /// Creates a new database file for the specified table ID
     pub fn create_file(&mut self, table_id: u32) -> Result<(), DatabaseError> {
         let path = self.resolve_physical_location_path(table_id);
         if path.exists() {
@@ -53,7 +49,7 @@ impl DiskManager {
         Ok(())
     }
 
-    /// Reads an 8KB page from disk.
+    /// Reads a page from disk
     pub fn read_page(&mut self, page_id: PageId) -> Result<[u8; PAGE_SIZE], DatabaseError> {
         let table_id = page_id.table_id();
         let offset = page_id.page_idx() as u64 * PAGE_SIZE as u64;
@@ -77,7 +73,7 @@ impl DiskManager {
         Ok(buffer)
     }
 
-    /// Writes a page to disk using in-place overwrite followed by fsync.
+    /// Writes a page to disk using in-place overwrite followed by fsync
     pub fn write_page(
         &mut self,
         page_id: PageId,
@@ -94,10 +90,7 @@ impl DiskManager {
         Ok(())
     }
 
-    /// Performs an atomic write by writing to a temporary file and renaming it.
-    ///
-    /// This pattern ensures that a crash during the write operation does not
-    /// leave the original file in a corrupted or "torn" state.
+    /// Performs an atomic write by writing to a temporary file and renaming it
     pub fn safe_write_page(
         &mut self,
         page_id: PageId,
@@ -108,7 +101,7 @@ impl DiskManager {
         self.atomic_write(table_id, offset, data)
     }
 
-    /// Appends a new 8KB page to the end of the specified table file.
+    /// Appends a new page to the end of the specified table file
     pub fn allocate_page(&mut self, table_id: u32) -> Result<PageId, DatabaseError> {
         let file = self.get_file_handle(table_id)?;
         let file_len = file.metadata()?.len();
@@ -129,7 +122,7 @@ impl DiskManager {
         Ok(page_id)
     }
 
-    /// Internal atomic write mechanism implementing Temp-Flush-Rename.
+    /// Internal atomic write mechanism implementing Temp-Flush-Rename
     fn atomic_write(
         &mut self,
         table_id: u32,
@@ -162,7 +155,7 @@ impl DiskManager {
             dir.sync_all()?;
         }
 
-        // Drop the cached handle as the filesystem inode has changed.
+        // Drop the cached handle as the filesystem inode has changed
         self.opened_files.remove(&table_id);
 
         Ok(())
