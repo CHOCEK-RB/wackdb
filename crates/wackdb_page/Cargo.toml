@@ -1,8 +1,11 @@
 [package]
 name = "wackdb_page"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-wackdb_common = { version = "0.1.0", path = "../wackdb_common" }
-zerocopy = { version = "0.8.48", features = ["derive"] }
+thiserror.workspace = true
+wackdb_storage = { path = "../wackdb_storage" }
+
+[lints]
+workspace = true

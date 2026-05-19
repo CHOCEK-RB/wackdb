@@ -1,181 +1,179 @@
+use crate::error::StorageError;
+use crate::types::PageId;
+use parking_lot::Mutex;
 use std::collections::HashMap;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU32, Ordering};
 
-use wackdb_common::config::Config;
-use wackdb_common::constants::PAGE_SIZE;
-use wackdb_common::errors::DatabaseError;
-use wackdb_common::types::PageId;
-
-/// DiskManager manages the physical persistence of fixed-size pages
-pub struct DiskManager {
-    data_dir: PathBuf,
-    opened_files: HashMap<u32, File>,
+/// Represents the physical layer that manages reads and writes to disk pages.
+pub trait DiskManager<const PAGE_SIZE: usize>: Send + Sync {
+    /// # Errors
+    /// Returns error on I/O issues
+    fn read_page(&self, page_id: PageId, data: &mut [u8; PAGE_SIZE]) -> Result<(), StorageError>;
+    /// # Errors
+    /// Returns error on I/O issues
+    fn write_page(&self, page_id: PageId, data: &[u8; PAGE_SIZE]) -> Result<(), StorageError>;
+    /// # Errors
+    /// Returns error on I/O issues
+    fn allocate_page(&self, file_id: u32) -> Result<PageId, StorageError>;
+    /// Deallocates a physical page. Space reuse should be handled via a free space map.
+    fn deallocate_page(&self, page_id: PageId);
 }
 
-impl DiskManager {
-    /// Initializes the DiskManager and ensures the data directory exists
-    pub fn new(config: &Config) -> Result<Self, DatabaseError> {
-        let data_dir = PathBuf::from(&config.data_dir);
-        if !data_dir.exists() {
-            fs::create_dir_all(&data_dir)?;
-        }
+/// Contains the file descriptor and tracked page count for an open database file.
+pub struct FileHandle {
+    /// Thread-safe file descriptor.
+    pub fd: Mutex<File>,
+    /// Thread-safe tracker of the total pages currently in the file.
+    pub total_pages: AtomicU32,
+}
 
+/// A basic file-system backed disk manager.
+pub struct BasicDiskManager<const PAGE_SIZE: usize> {
+    data_dir: PathBuf,
+    file_handles: Mutex<HashMap<u32, FileHandle>>,
+}
+
+impl<const PAGE_SIZE: usize> BasicDiskManager<PAGE_SIZE> {
+    /// # Errors
+    /// Returns error on I/O issues
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn new<P: AsRef<Path>>(data_dir: P) -> Result<Self, StorageError> {
+        std::fs::create_dir_all(data_dir.as_ref())?;
         Ok(Self {
-            data_dir,
-            opened_files: HashMap::new(),
+            data_dir: data_dir.as_ref().to_path_buf(),
+            file_handles: Mutex::new(HashMap::new()),
         })
     }
 
-    /// Creates a new database file for the specified table ID
-    pub fn create_file(&mut self, table_id: u32) -> Result<(), DatabaseError> {
-        let path = self.resolve_physical_location_path(table_id);
-        if path.exists() {
-            return Err(DatabaseError::Storage(format!(
-                "File for table {} already exists",
-                table_id
-            )));
-        }
-
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open(&path)?;
-
-        file.sync_all()?;
-        self.opened_files.insert(table_id, file);
-        Ok(())
-    }
-
-    /// Reads a page from disk
-    pub fn read_page(&mut self, page_id: PageId) -> Result<[u8; PAGE_SIZE], DatabaseError> {
-        let table_id = page_id.table_id();
-        let offset = page_id.page_idx() as u64 * PAGE_SIZE as u64;
-
-        let mut file = self.get_file_handle(table_id)?;
-        let mut buffer = [0u8; PAGE_SIZE];
-
-        file.seek(SeekFrom::Start(offset))?;
-        file.read_exact(&mut buffer).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                DatabaseError::Storage(format!(
-                    "Read past EOF: page {} in table {}",
-                    page_id.page_idx(),
-                    table_id
-                ))
-            } else {
-                DatabaseError::Io(e.to_string())
-            }
-        })?;
-
-        Ok(buffer)
-    }
-
-    /// Writes a page to disk using in-place overwrite followed by fsync
-    pub fn write_page(
-        &mut self,
-        page_id: PageId,
-        data: &[u8; PAGE_SIZE],
-    ) -> Result<(), DatabaseError> {
-        let table_id = page_id.table_id();
-        let offset = page_id.page_idx() as u64 * PAGE_SIZE as u64;
-
-        let mut file = self.get_file_handle(table_id)?;
-        file.seek(SeekFrom::Start(offset))?;
-        file.write_all(data)?;
-        file.sync_all()?;
-
-        Ok(())
-    }
-
-    /// Performs an atomic write by writing to a temporary file and renaming it
-    pub fn safe_write_page(
-        &mut self,
-        page_id: PageId,
-        data: &[u8; PAGE_SIZE],
-    ) -> Result<(), DatabaseError> {
-        let table_id = page_id.table_id();
-        let offset = page_id.page_idx() as u64 * PAGE_SIZE as u64;
-        self.atomic_write(table_id, offset, data)
-    }
-
-    /// Appends a new page to the end of the specified table file
-    pub fn allocate_page(&mut self, table_id: u32) -> Result<PageId, DatabaseError> {
-        let file = self.get_file_handle(table_id)?;
-        let file_len = file.metadata()?.len();
-
-        if !file_len.is_multiple_of(PAGE_SIZE as u64) {
-            return Err(DatabaseError::Storage(format!(
-                "Table file {} is not aligned to PAGE_SIZE (len: {})",
-                table_id, file_len
-            )));
-        }
-
-        let page_idx = (file_len / PAGE_SIZE as u64) as u32;
-        let page_id = PageId::new(table_id, page_idx);
-
-        let empty_page = [0u8; PAGE_SIZE];
-        self.atomic_write(table_id, file_len, &empty_page)?;
-
-        Ok(page_id)
-    }
-
-    /// Internal atomic write mechanism implementing Temp-Flush-Rename
-    fn atomic_write(
-        &mut self,
-        table_id: u32,
-        offset: u64,
-        data: &[u8],
-    ) -> Result<(), DatabaseError> {
-        let path = self.resolve_physical_location_path(table_id);
-        let temp_path = path.with_extension("tmp");
-
-        if path.exists() {
-            fs::copy(&path, &temp_path)?;
-        }
-
-        {
-            let mut temp_file = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(false)
-                .open(&temp_path)?;
-
-            temp_file.seek(SeekFrom::Start(offset))?;
-            temp_file.write_all(data)?;
-            temp_file.sync_all()?;
-        }
-
-        fs::rename(&temp_path, &path)?;
-
-        if let Some(parent) = path.parent() {
-            let dir = File::open(parent)?;
-            dir.sync_all()?;
-        }
-
-        // Drop the cached handle as the filesystem inode has changed
-        self.opened_files.remove(&table_id);
-
-        Ok(())
-    }
-
-    fn resolve_physical_location_path(&self, table_id: u32) -> PathBuf {
-        self.data_dir.join(format!("{}.db", table_id))
-    }
-
-    fn get_file_handle(&mut self, table_id: u32) -> Result<&File, DatabaseError> {
-        if !self.opened_files.contains_key(&table_id) {
-            let path = self.resolve_physical_location_path(table_id);
+    fn ensure_file_open(&self, file_id: u32) -> Result<(), StorageError> {
+        let mut handles = self.file_handles.lock();
+        if let std::collections::hash_map::Entry::Vacant(e) = handles.entry(file_id) {
+            let file_path = self.data_dir.join(file_id.to_string());
             let file = OpenOptions::new()
                 .read(true)
                 .write(true)
                 .create(true)
                 .truncate(false)
-                .open(path)?;
-            self.opened_files.insert(table_id, file);
+                .open(&file_path)?;
+
+            let metadata = file.metadata()?;
+            #[allow(clippy::cast_possible_truncation)]
+            let total_pages = (metadata.len() / (PAGE_SIZE as u64)) as u32;
+
+            e.insert(FileHandle {
+                fd: Mutex::new(file),
+                total_pages: AtomicU32::new(total_pages),
+            });
         }
-        Ok(self.opened_files.get(&table_id).unwrap())
+        Ok(())
+    }
+}
+
+impl<const PAGE_SIZE: usize> DiskManager<PAGE_SIZE> for BasicDiskManager<PAGE_SIZE> {
+    /// # Errors
+    /// Returns error on I/O issues
+    fn read_page(&self, page_id: PageId, data: &mut [u8; PAGE_SIZE]) -> Result<(), StorageError> {
+        self.ensure_file_open(page_id.file_id)?;
+        let handles = self.file_handles.lock();
+        let handle = handles
+            .get(&page_id.file_id)
+            .ok_or(StorageError::FileError(page_id.file_id))?;
+
+        let mut file = handle.fd.lock();
+        let offset = u64::from(page_id.page_num) * (PAGE_SIZE as u64);
+
+        let file_len = file.metadata()?.len();
+        if offset >= file_len {
+            data.fill(0);
+            return Ok(());
+        }
+
+        file.seek(SeekFrom::Start(offset))?;
+        let mut temp_buf = vec![0; PAGE_SIZE];
+        let bytes_read = file.read(&mut temp_buf)?;
+        data.copy_from_slice(&temp_buf);
+        if bytes_read < PAGE_SIZE {
+            data[bytes_read..].fill(0);
+        }
+
+        Ok(())
+    }
+
+    /// # Errors
+    /// Returns error on I/O issues
+    fn write_page(&self, page_id: PageId, data: &[u8; PAGE_SIZE]) -> Result<(), StorageError> {
+        self.ensure_file_open(page_id.file_id)?;
+        let handles = self.file_handles.lock();
+        let handle = handles
+            .get(&page_id.file_id)
+            .ok_or(StorageError::FileError(page_id.file_id))?;
+
+        let mut file = handle.fd.lock();
+        let offset = u64::from(page_id.page_num) * (PAGE_SIZE as u64);
+        file.seek(SeekFrom::Start(offset))?;
+        file.write_all(data)?;
+        file.sync_data()?;
+        Ok(())
+    }
+
+    /// # Errors
+    /// Returns error on I/O issues
+    fn allocate_page(&self, file_id: u32) -> Result<PageId, StorageError> {
+        self.ensure_file_open(file_id)?;
+        let handles = self.file_handles.lock();
+        let handle = handles
+            .get(&file_id)
+            .ok_or(StorageError::FileError(file_id))?;
+
+        let page_num = handle.total_pages.fetch_add(1, Ordering::SeqCst);
+        Ok(PageId { file_id, page_num })
+    }
+
+    fn deallocate_page(&self, _page_id: PageId) {
+        // Space reuse is typically handled by a Free Space Map (FSM) in Postgres.
+        // For simplicity in this educational DBMS, we leave it as a no-op initially.
+    }
+}
+
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    const TEST_PAGE_SIZE: usize = 8192;
+
+    #[test]
+    fn allocate_should_return_valid_page_id() {
+        let dir = tempdir().unwrap();
+        let disk_manager = BasicDiskManager::<TEST_PAGE_SIZE>::new(dir.path()).unwrap();
+
+        let page_id = disk_manager.allocate_page(100).unwrap();
+
+        assert_eq!(page_id.file_id, 100);
+        assert_eq!(page_id.page_num, 0);
+    }
+
+    #[test]
+    fn read_write_should_persist_data() {
+        let dir = tempdir().unwrap();
+        let disk_manager = BasicDiskManager::<TEST_PAGE_SIZE>::new(dir.path()).unwrap();
+        let page_id = disk_manager.allocate_page(100).unwrap();
+
+        let mut write_data = [0u8; TEST_PAGE_SIZE];
+        write_data[0] = 42;
+        write_data[TEST_PAGE_SIZE - 1] = 24;
+
+        disk_manager.write_page(page_id, &write_data).unwrap();
+
+        let mut read_data = [0u8; TEST_PAGE_SIZE];
+        disk_manager.read_page(page_id, &mut read_data).unwrap();
+
+        assert_eq!(read_data[0], 42);
+        assert_eq!(read_data[TEST_PAGE_SIZE - 1], 24);
+        assert_eq!(read_data[1..TEST_PAGE_SIZE - 1], [0u8; TEST_PAGE_SIZE - 2]);
     }
 }
