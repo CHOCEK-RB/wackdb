@@ -1,0 +1,16 @@
+[package]
+name = "wackdb_buffer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+thiserror.workspace = true
+parking_lot.workspace = true
+wackdb_storage = { path = "../wackdb_storage" }
+wackdb_page = { path = "../wackdb_page" }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints]
+workspace = true
