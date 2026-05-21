@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-wackdb_common = { path = "../wackdb_common" }
-anyhow = "1.0.102"
+wackdb_storage = { path = "../wackdb_storage" }
+wackdb_buffer = { path = "../wackdb_buffer" }
+wackdb_page = { path = "../wackdb_page" }
+tempfile = { workspace = true }
