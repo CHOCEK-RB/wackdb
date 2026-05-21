@@ -1,0 +1,55 @@
+direction: right
+
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+classes: {
+  struct: {
+    shape: class
+    style: { border-radius: 4 }
+  }
+  external: {
+    style: { stroke-dash: 5; opacity: 0.7 }
+  }
+}
+
+wackdb_page: {
+  SlottedPage: {
+    class: struct
+    "+data": "Box<Align8<PAGE_SIZE>>"
+  }
+  
+  SlottedPageHeader: {
+    class: struct
+    +log_sequence_number: u64
+    +total_slots: u16
+    +free_space_lower: u16
+    +free_space_upper: u16
+    +page_flags: u16
+  }
+
+  PageSlot: {
+    class: struct
+    +offset: u16
+    +length: u16
+  }
+
+  TupleHeader: {
+    class: struct
+    +xmin: u64
+    +xmax: u64
+  }
+
+  SlottedPage -> SlottedPageHeader: "Reads/Writes header"
+  SlottedPage -> PageSlot: "Manages slots"
+  PageSlot -> TupleHeader: "Points to Tuple"
+}
+
+wackdb_buffer: { class: external }
+wackdb_btree: { class: external }
+
+wackdb_buffer -> wackdb_page.SlottedPage: "Casts raw frames to SlottedPage"
+wackdb_btree -> wackdb_page.SlottedPage: "Wraps around SlottedPage"

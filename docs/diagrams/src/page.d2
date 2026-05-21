@@ -1,0 +1,44 @@
+direction: right
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+slotted_page: "SlottedPage Architecture (wackdb_page)" {
+  shape: class
+  +header: PageHeader
+  +slots: "SlotDirectory"
+  +data: "Raw Tuples (End to Start)"
+}
+
+PageHeader: "Struct" {
+  shape: sql_table
+  lsn: u64
+  next_free_slot: u16
+  free_space: u16
+  record_count: u16
+}
+
+SlotDirectory: "Array of Slots" {
+  shape: sql_table
+  offset: u16
+  length: u16
+}
+
+slotted_page -> PageHeader: "contains"
+slotted_page -> SlotDirectory: "contains"
+
+wal_record: "WAL Record Structure (wackdb_wal)" {
+  shape: sql_table
+  LSN: "u64 (8 bytes)"
+  Length: "u32 (4 bytes)"
+  Payload: "byte array (variable)"
+}
+
+tuple: "Tuple Structure (wackdb_tuple)" {
+  shape: sql_table
+  data: "Vec<u8> (variable length)"
+}
+
+slotted_page -> tuple: "Contains"
