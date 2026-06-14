@@ -1,0 +1,59 @@
+direction: right
+
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+classes: {
+  struct: {
+    shape: class
+    style: { border-radius: 4 }
+  }
+  external: {
+    style: { stroke-dash: 5; opacity: 0.7 }
+  }
+}
+
+wackdb_btree: {
+  BTreePageHeader: {
+    class: struct
+    +node_type: u8
+    +num_keys: u16
+    +max_keys: u16
+    +parent_page_id: PageId
+    +next_page_id: PageId
+  }
+  
+  LeafNode: {
+    class: struct
+    +header: BTreePageHeader
+    "+keys": "i32[]"
+    "+values": "CTID[]"
+  }
+
+  InternalNode: {
+    class: struct
+    +header: BTreePageHeader
+    "+keys": "i32[]"
+    "+children": "PageId[]"
+  }
+
+  BTree: {
+    class: struct
+    +root_page_id: "Option<PageId>"
+    "-bpm": "&mut BufferPoolManager"
+  }
+
+  LeafNode -> BTreePageHeader: "has header"
+  InternalNode -> BTreePageHeader: "has header"
+  BTree -> LeafNode: "Search / Insert"
+  BTree -> InternalNode: "Traverse"
+}
+
+wackdb_buffer: { class: external }
+wackdb_storage: { class: external }
+
+wackdb_btree.BTree -> wackdb_buffer: "Fetches/Pins pages"
+wackdb_btree.BTreePageHeader -> wackdb_storage: "Uses PageId"

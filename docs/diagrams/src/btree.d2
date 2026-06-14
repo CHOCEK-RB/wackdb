@@ -1,0 +1,48 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+btree: "B+ Tree Physical Architecture (wackdb_btree)" {
+  shape: rectangle
+
+  header: "BTreePageHeader (16 bytes)" {
+    shape: sql_table
+    lsn: u64
+    page_id: u32
+    parent_page_id: u32
+    page_type: u16
+    num_keys: u16
+  }
+
+  leaf_node: "LeafNode Layout (Page 8192 bytes)" {
+    shape: class
+    +header: BTreePageHeader
+    +next_page_id: u32
+    +prev_page_id: u32
+    +keys: "KeyType[max_keys]"
+    +values: "ValueType[max_keys]"
+  }
+
+  internal_node: "InternalNode Layout (Page 8192 bytes)" {
+    shape: class
+    +header: BTreePageHeader
+    +keys: "KeyType[max_keys]"
+    +children: "PageId[max_keys]"
+  }
+}
+
+merging: "Merging Process (Delete)" {
+  shape: step
+  step1: "1. Delete key from Leaf"
+  step2: "2. Check underflow (num_keys < max_keys/2)"
+  step3: "3. Read Parent Node"
+  step4: "4. Find Sibling (Left or Right)"
+  step5: "5. Move all keys/values to Sibling"
+  step6: "6. Update next_page_id pointers"
+  step7: "7. Delete leaf pointer from Parent"
+  
+  step1 -> step2 -> step3 -> step4 -> step5 -> step6 -> step7
+}
