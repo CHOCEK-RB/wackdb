@@ -11,9 +11,9 @@ use crossterm::{
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Margin},
     style::{Color, Style},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
     Terminal,
 };
 use ratatui_textarea::{Input, Key, TextArea};
@@ -80,9 +80,11 @@ where
     textarea.set_block(
         Block::default()
             .borders(Borders::ALL)
-            .title("SQL Input (Enter to Execute)")
+            .title("SQL Input (Enter to Execute, Ctrl+Up/Down or PageUp/Down to Scroll Output)")
             .style(Style::default().fg(Color::LightGreen)),
     );
+
+    let mut vertical_scroll = 0;
 
     loop {
         terminal.draw(|f| {
@@ -114,16 +116,56 @@ where
             );
             f.render_widget(metrics_widget, chunks[1]);
 
+            let content_len = logs.len();
+            let view_height = chunks[2].height.saturating_sub(2) as usize;
+            let max_scroll = content_len.saturating_sub(view_height);
+            if vertical_scroll > max_scroll {
+                vertical_scroll = max_scroll;
+            }
+
             let messages: String = logs.join("\n");
             let logs_widget = Paragraph::new(messages)
-                .block(Block::default().borders(Borders::ALL).title("Output"));
+                .block(Block::default().borders(Borders::ALL).title("Output"))
+                .style(Style::default().fg(Color::White))
+                .scroll((vertical_scroll as u16, 0));
             f.render_widget(logs_widget, chunks[2]);
+
+            let mut scrollbar_state = ScrollbarState::default()
+                .content_length(max_scroll)
+                .position(vertical_scroll);
+
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(Some("▲"))
+                .end_symbol(Some("▼"));
+
+            f.render_stateful_widget(
+                scrollbar,
+                chunks[2].inner(Margin {
+                    vertical: 1,
+                    horizontal: 0,
+                }),
+                &mut scrollbar_state,
+            );
         })?;
 
         let event = event::read()?;
         match event.into() {
             Input { key: Key::Esc, .. } => return Ok(()),
-            Input { key: Key::Enter, .. } => {
+            Input { key: Key::PageUp, .. } => {
+                vertical_scroll = vertical_scroll.saturating_sub(10);
+            }
+            Input { key: Key::PageDown, .. } => {
+                vertical_scroll = vertical_scroll.saturating_add(10);
+            }
+            Input { key: Key::Up, ctrl: true, .. } => {
+                vertical_scroll = vertical_scroll.saturating_sub(1);
+            }
+            Input { key: Key::Down, ctrl: true, .. } => {
+                vertical_scroll = vertical_scroll.saturating_add(1);
+            }
+            Input {
+                key: Key::Enter, ..
+            } => {
                 let text = textarea.lines().join("\n");
                 let text = text.trim();
                 if text == "exit" || text == "quit" {
@@ -132,8 +174,8 @@ where
                 if !text.is_empty() {
                     if text == "\\demo_buffer" {
                         logs.push("--- DEMO BUFFER POOL ---".to_string());
-                        logs.push("Inserting 10,000 records into Buffer Pool...".to_string());
-                        
+                        logs.push("Beginning batch insert of 10,000 records...".to_string());
+
                         let mut pages_allocated = 1;
                         let mut total_inserted = 0;
                         let (mut current_frame_id, mut current_page_id) = match bpm.new_page(0) {
@@ -143,12 +185,28 @@ where
                                 continue;
                             }
                         };
-                        
+
+                        let cities = [
+                            "New York",
+                            "San Francisco",
+                            "London",
+                            "Berlin",
+                            "Tokyo",
+                            "Paris",
+                            "Madrid",
+                            "Lima",
+                            "Toronto",
+                            "Sydney",
+                        ];
+
                         for i in 1..=10000 {
-                            let record = format!("User{}@example.com", i);
+                            let name = format!("User{}", i);
+                            let email = format!("user{}@example.com", i);
+                            let city = cities[(i as usize) % cities.len()];
+                            let record = format!("{},{},{},{}", i, name, email, city);
                             let bytes = record.as_bytes();
                             let mut inserted = false;
-                            
+
                             {
                                 let mut page_guard = bpm.write_page(current_frame_id);
                                 if page_guard.header().total_slots == 0 {
@@ -159,14 +217,14 @@ where
                                     total_inserted += 1;
                                 }
                             }
-                            
+
                             if !inserted {
                                 let _ = bpm.unpin_page(current_page_id, true);
                                 if let Ok((new_frame, new_page)) = bpm.new_page(0) {
                                     current_frame_id = new_frame;
                                     current_page_id = new_page;
                                     pages_allocated += 1;
-                                    
+
                                     let mut new_page_guard = bpm.write_page(current_frame_id);
                                     new_page_guard.init();
                                     if new_page_guard.insert_record(bytes, 0).is_some() {
@@ -177,22 +235,87 @@ where
                                     break;
                                 }
                             }
+
+                            if i <= 5 || i > 9995 {
+                                if i == 6 {
+                                    logs.push(
+                                        "... (skipping prints for bulk inserts) ...".to_string(),
+                                    );
+                                }
+                                logs.push(format!(
+                                    "[INSERT] Page ID: {:?}, Size: {}, Tuple: {}",
+                                    current_page_id.page_num,
+                                    bytes.len(),
+                                    record
+                                ));
+                            }
                         }
                         let _ = bpm.unpin_page(current_page_id, true);
-                        
-                        logs.push(format!("Inserted {} records.", total_inserted));
-                        logs.push(format!("Allocated {} pages.", pages_allocated));
-                        logs.push(format!("Buffer Pool Hit Rate: {:.2}%", bpm.get_hit_rate() * 100.0));
+
+                        logs.push("\n[ Batch Insert Complete ]".to_string());
+                        logs.push(format!("Total Records Inserted: {}", total_inserted));
+                        logs.push(format!("Total Pages Allocated: {}", pages_allocated));
+
+                        logs.push(format!(
+                            "\n[ Architecture of the Final Page (Page {}) ]",
+                            current_page_id.page_num
+                        ));
+                        {
+                            let last_page_guard = bpm.read_page(current_frame_id);
+                            let header = last_page_guard.header();
+                            logs.push(format!("- Total Slots: {}", header.total_slots));
+                            logs.push(format!("- Free Space Upper: {}", header.free_space_upper));
+
+                            logs.push("\n[ Tuple Data Region (Last Page) ]".to_string());
+                            for i in 0..header.total_slots as usize {
+                                if let Some((_, data)) = last_page_guard.get_record(i) {
+                                    logs.push(format!(
+                                        " Data {:02} -> {}",
+                                        i,
+                                        String::from_utf8_lossy(data)
+                                    ));
+                                }
+                            }
+                        }
+
+                        logs.push(format!(
+                            "\n[ Cache Verification on Last Page (Page ID: {:?}) ]",
+                            current_page_id
+                        ));
+                        let hits_before = bpm.get_hits();
+                        let misses_before = bpm.get_misses();
+                        let _ = bpm.fetch_page(current_page_id);
+                        let hits_after = bpm.get_hits();
+
+                        logs.push(format!(" - Misses so far: {}", misses_before));
+                        logs.push(format!(
+                            " - Hits on second load: {}",
+                            hits_after - hits_before
+                        ));
+
+                        let _ = bpm.unpin_page(current_page_id, false);
+
+                        if let Err(e) = bpm.flush_all_pages() {
+                            logs.push(format!("Warning: Failed to flush to disk: {:?}", e));
+                        } else {
+                            logs.push("\n[PERSIST] All pages successfully flushed to disk (check the wack.db file!).".to_string());
+                        }
                     } else if text == "\\demo_btree" {
                         logs.push("--- DEMO B+ TREE ---".to_string());
-                        logs.push("Initializing B+ Tree and inserting 400 keys (triggers leaf split)...".to_string());
-                        
+                        logs.push(
+                            "Initializing B+ Tree Index on top of Buffer Pool...".to_string(),
+                        );
+
                         let btree = wackdb_btree::tree::BTreeIndex::new(bpm, None);
                         let mut success = true;
-                        
+
+                        logs.push("Inserting keys 0 to 399 to trigger a root SPLIT...".to_string());
                         for i in 0u16..400 {
                             let ctid = wackdb_storage::CTID {
-                                page_id: wackdb_storage::PageId { file_id: i as u32, page_num: i as u32 },
+                                page_id: wackdb_storage::PageId {
+                                    file_id: i as u32,
+                                    page_num: i as u32,
+                                },
                                 slot_idx: i,
                             };
                             if let Err(e) = btree.insert(i as i32, ctid) {
@@ -200,14 +323,37 @@ where
                                 success = false;
                                 break;
                             }
+
+                            if i <= 3 || i >= 397 {
+                                if i == 4 {
+                                    logs.push(
+                                        "... (skipping prints for bulk inserts) ...".to_string(),
+                                    );
+                                }
+                                logs.push(format!("[BTREE INSERT] Key: {}, CTID: {:?}", i, ctid));
+                            }
                         }
-                        
+
                         if success {
-                            logs.push("Successfully inserted 400 keys and triggered split!".to_string());
+                            logs.push("\n[ BTREE Batch Insert Complete ]".to_string());
+                            logs.push("Successfully inserted 400 keys. The leaf node reached max capacity (340) and SPLIT into a new root and right sibling!".to_string());
+
+                            logs.push("\n[ Point Search Verifications ]".to_string());
                             let val_0 = btree.search(0);
+                            let val_150 = btree.search(150);
                             let val_399 = btree.search(399);
                             logs.push(format!("Search Key 0 -> {:?}", val_0));
+                            logs.push(format!("Search Key 150 -> {:?}", val_150));
                             logs.push(format!("Search Key 399 -> {:?}", val_399));
+
+                            if let Err(e) = bpm.flush_all_pages() {
+                                logs.push(format!("Warning: Failed to flush to disk: {:?}", e));
+                            } else {
+                                logs.push(
+                                    "\n[PERSIST] B+ Tree changes fully persisted to disk."
+                                        .to_string(),
+                                );
+                            }
                         }
                     } else {
                         logs.push(format!("Executing: {}", text));
@@ -217,14 +363,15 @@ where
                             Err(e) => logs.push(format!("Parse Error: {}", e)),
                         }
                     }
-                    
+
                     textarea = TextArea::default();
                     textarea.set_block(
                         Block::default()
                             .borders(Borders::ALL)
-                            .title("SQL Input (Enter to Execute)")
+                            .title("SQL Input (Enter to Execute, Ctrl+Up/Down or PageUp/Down to Scroll Output)")
                             .style(Style::default().fg(Color::LightGreen)),
                     );
+                    vertical_scroll = usize::MAX;
                 }
             }
             input => {
