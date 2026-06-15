@@ -10,13 +10,16 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
-    Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     widgets::{Block, Borders, Paragraph},
+    Terminal,
 };
 use std::{error::Error, io};
+use std::path::Path;
+use wackdb_storage::disk_manager::BasicDiskManager;
+use wackdb_buffer::buffer_pool::BufferPoolManager;
 
 mod parser;
 
@@ -38,8 +41,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
+    // Setup DB
+    let data_dir = Path::new(&args.db_path);
+    let disk_manager = BasicDiskManager::<8192>::new(data_dir)?;
+    let mut bpm = BufferPoolManager::new(500, disk_manager);
+
     // Run TUI
-    let res = run_app(&mut terminal, &args.db_path);
+    let res = run_app(&mut terminal, &args.db_path, &mut bpm);
 
     // Restore terminal
     disable_raw_mode()?;
@@ -57,7 +65,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, db_path: &str) -> Result<(), Box<dyn Error>>
+fn run_app<B: Backend, D: wackdb_storage::DiskManager<8192>>(
+    terminal: &mut Terminal<B>,
+    db_path: &str,
+    bpm: &mut BufferPoolManager<8192, D>,
+) -> Result<(), Box<dyn Error>>
 where
     <B as Backend>::Error: 'static,
 {
@@ -69,7 +81,14 @@ where
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(1)
-                .constraints([Constraint::Length(3), Constraint::Min(1)].as_ref())
+                .constraints(
+                    [
+                        Constraint::Length(3),
+                        Constraint::Length(3),
+                        Constraint::Min(1),
+                    ]
+                    .as_ref(),
+                )
                 .split(f.area());
 
             let input_widget = Paragraph::new(format!("> {}", input))
@@ -77,10 +96,19 @@ where
                 .block(Block::default().borders(Borders::ALL).title("SQL Input"));
             f.render_widget(input_widget, chunks[0]);
 
+            let metrics_widget = Paragraph::new(format!(
+                "Hit Rate: {:.2}% | Total Hits: {} | Total Misses: {}",
+                bpm.get_hit_rate() * 100.0,
+                bpm.get_hits(),
+                bpm.get_misses()
+            ))
+            .block(Block::default().borders(Borders::ALL).title("Buffer Pool Metrics"));
+            f.render_widget(metrics_widget, chunks[1]);
+
             let messages: String = logs.join("\n");
             let logs_widget = Paragraph::new(messages)
                 .block(Block::default().borders(Borders::ALL).title("Output"));
-            f.render_widget(logs_widget, chunks[1]);
+            f.render_widget(logs_widget, chunks[2]);
         })?;
 
         if let Event::Key(key) = event::read()? {
