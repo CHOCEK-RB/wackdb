@@ -15,4 +15,8 @@ pub mod error;
 /// Memory frame descriptors.
 pub mod frame;
 
+/// Buffer pool replacement policies.
+pub mod replacer;
+
 pub use error::BufferError;
+pub use replacer::ReplacementPolicy;
