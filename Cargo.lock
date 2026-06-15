@@ -1649,6 +1649,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "wackdb_btree"
+version = "0.1.0"
+dependencies = [
+ "parking_lot",
+ "tempfile",
+ "thiserror 2.0.18",
+ "wackdb_buffer",
+ "wackdb_page",
+ "wackdb_storage",
+ "zerocopy",
+]
+
+[[package]]
 name = "wackdb_buffer"
 version = "0.1.0"
 dependencies = [
@@ -1993,6 +2006,26 @@ dependencies = [
  "serde_json",
  "unicode-xid",
  "wasmparser",
+]
+
+[[package]]
+name = "zerocopy"
+version = "0.8.52"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce1022995ff5ff5d841ad7d994facc23098cd40152f2c1d11cd607c6f530653f"
+dependencies = [
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.8.52"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ae7f38b72ec2a254e2b87ef277cf2cd4fb97cbebf944faa6f33354da0867930"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]
