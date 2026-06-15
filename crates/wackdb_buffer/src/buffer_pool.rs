@@ -234,3 +234,54 @@ impl<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BufferPoolManager<PAGE_S
         Ok((frame_id, page_id))
     }
 }
+
+#[allow(clippy::unwrap_used)]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use wackdb_storage::BasicDiskManager;
+
+    const TEST_PAGE_SIZE: usize = 8192;
+
+    #[test]
+    fn test_buffer_pool_evicts_lru() {
+        let dir = tempdir().unwrap();
+        let disk_manager = BasicDiskManager::<TEST_PAGE_SIZE>::new(dir.path()).unwrap();
+        let pool = BufferPoolManager::new(3, disk_manager);
+
+        // Fetch 3 pages, pool is full
+        let page0 = pool.new_page(1).unwrap().1; // frame 0
+        let page1 = pool.new_page(1).unwrap().1; // frame 1
+        let page2 = pool.new_page(1).unwrap().1; // frame 2
+
+        pool.unpin_page(page0, false).unwrap();
+        pool.unpin_page(page1, false).unwrap();
+        pool.unpin_page(page2, false).unwrap();
+
+        // Fetch a 4th page, should evict page0
+        let page3 = pool.new_page(1).unwrap().1; // Reuses frame 0
+
+        pool.unpin_page(page3, false).unwrap();
+
+        // Fetch page0 again, should evict page1
+        let page0_new = pool.fetch_page(page0).unwrap(); // Reuses frame 1
+        pool.unpin_page(page0, false).unwrap();
+
+        assert_eq!(page0_new, 1);
+    }
+
+    #[test]
+    fn test_buffer_pool_respects_pins() {
+        let dir = tempdir().unwrap();
+        let disk_manager = BasicDiskManager::<TEST_PAGE_SIZE>::new(dir.path()).unwrap();
+        let pool = BufferPoolManager::new(2, disk_manager);
+
+        let _page0 = pool.new_page(1).unwrap().1; // pinned
+        let _page1 = pool.new_page(1).unwrap().1; // pinned
+
+        // Pool is full and all pinned, fetching 3rd should fail
+        let res = pool.new_page(1);
+        assert!(matches!(res, Err(BufferError::NoFreeFrames)));
+    }
+}
