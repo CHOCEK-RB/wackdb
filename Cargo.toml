@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = [
+members = ["crates/wackdb_btree",
   "crates/wackdb_buffer",
   "crates/wackdb_cli",
   "crates/wackdb_page",

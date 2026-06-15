@@ -1,0 +1,14 @@
+[package]
+name = "wackdb_btree"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wackdb_storage = { path = "../wackdb_storage" }
+wackdb_page = { path = "../wackdb_page" }
+wackdb_buffer = { path = "../wackdb_buffer" }
+thiserror = { workspace = true }
+zerocopy = { workspace = true }
+
+[lints]
+workspace = true
