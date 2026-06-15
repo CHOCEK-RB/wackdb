@@ -18,6 +18,8 @@ use ratatui::{
 };
 use std::{error::Error, io};
 
+mod parser;
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -95,8 +97,12 @@ where
                     }
 
                     logs.push(format!("Executing: {}", input));
-                    // Parser execution will go here later
-
+                    let mut p = parser::Parser::new(&input);
+                    match p.parse() {
+                        Ok(ast) => logs.push(format!("Parsed AST: {:?}", ast)),
+                        Err(e) => logs.push(format!("Parse Error: {}", e)),
+                    }
+                    
                     input.clear();
                 }
                 KeyCode::Esc => {
