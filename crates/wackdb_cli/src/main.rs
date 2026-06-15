@@ -10,16 +10,16 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     widgets::{Block, Borders, Paragraph},
-    Terminal,
 };
-use std::{error::Error, io};
 use std::path::Path;
-use wackdb_storage::disk_manager::BasicDiskManager;
+use std::{error::Error, io};
 use wackdb_buffer::buffer_pool::BufferPoolManager;
+use wackdb_storage::disk_manager::BasicDiskManager;
 
 mod parser;
 
@@ -102,7 +102,11 @@ where
                 bpm.get_hits(),
                 bpm.get_misses()
             ))
-            .block(Block::default().borders(Borders::ALL).title("Buffer Pool Metrics"));
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Buffer Pool Metrics"),
+            );
             f.render_widget(metrics_widget, chunks[1]);
 
             let messages: String = logs.join("\n");
@@ -130,7 +134,7 @@ where
                         Ok(ast) => logs.push(format!("Parsed AST: {:?}", ast)),
                         Err(e) => logs.push(format!("Parse Error: {}", e)),
                     }
-                    
+
                     input.clear();
                 }
                 KeyCode::Esc => {
