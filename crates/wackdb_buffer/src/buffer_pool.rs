@@ -1,4 +1,6 @@
 use crate::frame::FrameDescriptor;
+use crate::lru::LRUReplacer;
+use crate::replacer::ReplacementPolicy;
 use crate::BufferError;
 use parking_lot::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::collections::HashMap;
@@ -17,6 +19,8 @@ pub struct BufferPoolManager<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> 
     page_table: Mutex<HashMap<PageId, usize>>,
     /// Disk manager for fetching/flushing.
     disk_manager: D,
+    /// Page replacement policy.
+    replacer: LRUReplacer,
 
     // Metrics
     hits: AtomicUsize,
@@ -39,6 +43,7 @@ impl<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BufferPoolManager<PAGE_S
             descriptors,
             page_table: Mutex::new(HashMap::with_capacity(pool_size)),
             disk_manager,
+            replacer: LRUReplacer::new(pool_size),
 
             hits: AtomicUsize::new(0),
             misses: AtomicUsize::new(0),
@@ -92,8 +97,8 @@ impl<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BufferPoolManager<PAGE_S
             }
         }
 
-        // Without a replacement policy
-        Err(BufferError::NoFreeFrames)
+        // Use replacement policy
+        self.replacer.evict().ok_or(BufferError::NoFreeFrames)
     }
 
     /// Fetches a page from the buffer pool. If it doesn't exist, reads from disk.
@@ -108,6 +113,8 @@ impl<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BufferPoolManager<PAGE_S
             self.hits.fetch_add(1, Ordering::SeqCst);
             let desc = &self.descriptors[frame_id];
             desc.pin();
+            self.replacer.record_access(frame_id);
+            self.replacer.set_pin(frame_id, true);
 
             return Ok(frame_id);
         }
@@ -144,6 +151,8 @@ impl<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BufferPoolManager<PAGE_S
 
         // Setup descriptor
         desc.pin();
+        self.replacer.record_access(frame_id);
+        self.replacer.set_pin(frame_id, true);
 
         Ok(frame_id)
     }
@@ -160,6 +169,9 @@ impl<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BufferPoolManager<PAGE_S
                 desc.is_dirty.store(true, Ordering::SeqCst);
             }
             desc.unpin();
+            if desc.pin_count.load(Ordering::SeqCst) == 0 {
+                self.replacer.set_pin(frame_id, false);
+            }
 
             Ok(())
         } else {
