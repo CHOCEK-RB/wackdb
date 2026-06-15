@@ -6,3 +6,5 @@
 pub mod node;
 /// Abstract interface for indexing structures.
 pub mod traits;
+/// B+ Tree index orchestrator.
+pub mod tree;

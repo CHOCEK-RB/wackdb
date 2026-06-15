@@ -9,6 +9,7 @@ wackdb_page = { path = "../wackdb_page" }
 wackdb_buffer = { path = "../wackdb_buffer" }
 thiserror = { workspace = true }
 zerocopy = { workspace = true }
+parking_lot = { workspace = true }
 
 [lints]
 workspace = true
