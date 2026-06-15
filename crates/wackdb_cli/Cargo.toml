@@ -8,3 +8,6 @@ wackdb_storage = { path = "../wackdb_storage" }
 wackdb_buffer = { path = "../wackdb_buffer" }
 wackdb_page = { path = "../wackdb_page" }
 tempfile = { workspace = true }
+clap = { workspace = true }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
