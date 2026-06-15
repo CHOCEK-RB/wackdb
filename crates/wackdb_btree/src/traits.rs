@@ -17,11 +17,7 @@ pub trait Index {
     /// Range search for range queries
     /// # Errors
     /// Returns `BTreeError` on underlying storage or logic errors.
-    fn range_search(
-        &self,
-        start_key: i32,
-        end_key: i32,
-    ) -> Result<Vec<CTID>, BTreeError>;
+    fn range_search(&self, start_key: i32, end_key: i32) -> Result<Vec<CTID>, BTreeError>;
 
     /// Delete a key
     /// # Errors

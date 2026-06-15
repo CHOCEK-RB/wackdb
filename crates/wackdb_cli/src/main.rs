@@ -10,11 +10,11 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout, Margin},
     style::{Color, Style},
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
-    Terminal,
 };
 use ratatui_textarea::{Input, Key, TextArea};
 use std::path::Path;
@@ -151,16 +151,28 @@ where
         let event = event::read()?;
         match event.into() {
             Input { key: Key::Esc, .. } => return Ok(()),
-            Input { key: Key::PageUp, .. } => {
+            Input {
+                key: Key::PageUp, ..
+            } => {
                 vertical_scroll = vertical_scroll.saturating_sub(10);
             }
-            Input { key: Key::PageDown, .. } => {
+            Input {
+                key: Key::PageDown, ..
+            } => {
                 vertical_scroll = vertical_scroll.saturating_add(10);
             }
-            Input { key: Key::Up, ctrl: true, .. } => {
+            Input {
+                key: Key::Up,
+                ctrl: true,
+                ..
+            } => {
                 vertical_scroll = vertical_scroll.saturating_sub(1);
             }
-            Input { key: Key::Down, ctrl: true, .. } => {
+            Input {
+                key: Key::Down,
+                ctrl: true,
+                ..
+            } => {
                 vertical_scroll = vertical_scroll.saturating_add(1);
             }
             Input {

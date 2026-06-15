@@ -11,7 +11,7 @@
 #![allow(clippy::manual_memcpy)]
 
 use crate::node::{
-    BTreePageHeader, InternalNode, KeyType, LeafNode, NodeType, ValueType, INVALID_PAGE_ID,
+    BTreePageHeader, INVALID_PAGE_ID, InternalNode, KeyType, LeafNode, NodeType, ValueType,
 };
 use thiserror::Error;
 use wackdb_buffer::buffer_pool::BufferPoolManager;
@@ -153,7 +153,7 @@ impl<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BTreeIndex<'a, PAGE_
             temp_keys.push(leaf.keys[i]);
             temp_vals.push(leaf.values[i]);
         }
-        
+
         let insert_idx = match temp_keys.binary_search(&key) {
             Ok(_) => return Err(BTreeError::DuplicateKey),
             Err(pos) => pos,
@@ -188,7 +188,7 @@ impl<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BTreeIndex<'a, PAGE_
             let (root_frame, new_root_id) = self.buffer_pool.new_page(leaf_page_id.file_id)?;
             let mut root_data = self.buffer_pool.write_page(root_frame);
             let root = unsafe { &mut *(root_data.data.as_mut_ptr() as *mut InternalNode) };
-            
+
             root.header.node_type = NodeType::Internal as u8;
             root.header.max_keys = leaf.header.max_keys; // Simplified
             root.header.num_keys = 1;
@@ -222,7 +222,9 @@ impl<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BTreeIndex<'a, PAGE_
 
         // Parent insertion logic (Internal node split not fully implemented yet)
         // For Week 10 requirements, single level split is often enough for testing.
-        Err(BTreeError::BufferError(wackdb_buffer::BufferError::NoFreeFrames)) // Or custom unhandled split error
+        Err(BTreeError::BufferError(
+            wackdb_buffer::BufferError::NoFreeFrames,
+        )) // Or custom unhandled split error
     }
 
     fn find_leaf_page(&self, key: KeyType) -> Result<Option<(usize, PageId)>, BTreeError> {
@@ -300,13 +302,19 @@ impl<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> crate::traits::Index
     ) -> Result<Vec<wackdb_storage::CTID>, crate::node::BTreeError> {
         let mut results = Vec::new();
 
-        let mut curr_page_id = match self.find_leaf_page(start_key).map_err(|_| crate::node::BTreeError::KeyNotFound)? {
+        let mut curr_page_id = match self
+            .find_leaf_page(start_key)
+            .map_err(|_| crate::node::BTreeError::KeyNotFound)?
+        {
             Some((_frame_id, pid)) => pid,
             None => return Ok(results),
         };
 
         loop {
-            let frame_id = self.buffer_pool.fetch_page(curr_page_id).map_err(|_| crate::node::BTreeError::KeyNotFound)?;
+            let frame_id = self
+                .buffer_pool
+                .fetch_page(curr_page_id)
+                .map_err(|_| crate::node::BTreeError::KeyNotFound)?;
             let page_data = self.buffer_pool.read_page(frame_id);
             let leaf_node = unsafe { &*(page_data.data.as_ptr() as *const crate::node::LeafNode) };
             let num_keys = leaf_node.header.num_keys as usize;
@@ -386,8 +394,20 @@ mod tests {
         let buffer = BufferPoolManager::new(10, disk);
         let mut btree = BTreeIndex::new(&buffer, None);
 
-        let ctid1 = wackdb_storage::CTID { page_id: wackdb_storage::PageId { file_id: 1, page_num: 1 }, slot_idx: 1 };
-        let ctid2 = wackdb_storage::CTID { page_id: wackdb_storage::PageId { file_id: 2, page_num: 2 }, slot_idx: 2 };
+        let ctid1 = wackdb_storage::CTID {
+            page_id: wackdb_storage::PageId {
+                file_id: 1,
+                page_num: 1,
+            },
+            slot_idx: 1,
+        };
+        let ctid2 = wackdb_storage::CTID {
+            page_id: wackdb_storage::PageId {
+                file_id: 2,
+                page_num: 2,
+            },
+            slot_idx: 2,
+        };
 
         // Insert
         crate::traits::Index::insert(&mut btree, 10, ctid1).unwrap();
@@ -407,7 +427,13 @@ mod tests {
 
         // Insert enough to trigger a split. Max keys is 340 for 8KB.
         for i in 0u16..400 {
-            let ctid = wackdb_storage::CTID { page_id: wackdb_storage::PageId { file_id: i as u32, page_num: i as u32 }, slot_idx: i };
+            let ctid = wackdb_storage::CTID {
+                page_id: wackdb_storage::PageId {
+                    file_id: i as u32,
+                    page_num: i as u32,
+                },
+                slot_idx: i,
+            };
             crate::traits::Index::insert(&mut btree, i as i32, ctid).unwrap();
         }
 
