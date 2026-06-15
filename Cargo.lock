@@ -1694,6 +1694,7 @@ dependencies = [
  "ratatui",
  "ratatui-textarea",
  "tempfile",
+ "wackdb_btree",
  "wackdb_buffer",
  "wackdb_page",
  "wackdb_storage",

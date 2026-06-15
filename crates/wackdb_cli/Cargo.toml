@@ -7,6 +7,7 @@ edition = "2024"
 wackdb_storage = { path = "../wackdb_storage" }
 wackdb_buffer = { path = "../wackdb_buffer" }
 wackdb_page = { path = "../wackdb_page" }
+wackdb_btree = { path = "../wackdb_btree" }
 tempfile = { workspace = true }
 clap = { workspace = true }
 crossterm = { workspace = true }

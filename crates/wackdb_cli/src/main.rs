@@ -130,11 +130,92 @@ where
                     return Ok(());
                 }
                 if !text.is_empty() {
-                    logs.push(format!("Executing: {}", text));
-                    let mut p = parser::Parser::new(text);
-                    match p.parse() {
-                        Ok(ast) => logs.push(format!("Parsed AST: {:?}", ast)),
-                        Err(e) => logs.push(format!("Parse Error: {}", e)),
+                    if text == "\\demo_buffer" {
+                        logs.push("--- DEMO BUFFER POOL ---".to_string());
+                        logs.push("Inserting 10,000 records into Buffer Pool...".to_string());
+                        
+                        let mut pages_allocated = 1;
+                        let mut total_inserted = 0;
+                        let (mut current_frame_id, mut current_page_id) = match bpm.new_page(0) {
+                            Ok(res) => res,
+                            Err(e) => {
+                                logs.push(format!("Error: {:?}", e));
+                                continue;
+                            }
+                        };
+                        
+                        for i in 1..=10000 {
+                            let record = format!("User{}@example.com", i);
+                            let bytes = record.as_bytes();
+                            let mut inserted = false;
+                            
+                            {
+                                let mut page_guard = bpm.write_page(current_frame_id);
+                                if page_guard.header().total_slots == 0 {
+                                    page_guard.init();
+                                }
+                                if page_guard.insert_record(bytes, 0).is_some() {
+                                    inserted = true;
+                                    total_inserted += 1;
+                                }
+                            }
+                            
+                            if !inserted {
+                                let _ = bpm.unpin_page(current_page_id, true);
+                                if let Ok((new_frame, new_page)) = bpm.new_page(0) {
+                                    current_frame_id = new_frame;
+                                    current_page_id = new_page;
+                                    pages_allocated += 1;
+                                    
+                                    let mut new_page_guard = bpm.write_page(current_frame_id);
+                                    new_page_guard.init();
+                                    if new_page_guard.insert_record(bytes, 0).is_some() {
+                                        total_inserted += 1;
+                                    }
+                                } else {
+                                    logs.push("Error allocating new page!".to_string());
+                                    break;
+                                }
+                            }
+                        }
+                        let _ = bpm.unpin_page(current_page_id, true);
+                        
+                        logs.push(format!("Inserted {} records.", total_inserted));
+                        logs.push(format!("Allocated {} pages.", pages_allocated));
+                        logs.push(format!("Buffer Pool Hit Rate: {:.2}%", bpm.get_hit_rate() * 100.0));
+                    } else if text == "\\demo_btree" {
+                        logs.push("--- DEMO B+ TREE ---".to_string());
+                        logs.push("Initializing B+ Tree and inserting 400 keys (triggers leaf split)...".to_string());
+                        
+                        let btree = wackdb_btree::tree::BTreeIndex::new(bpm, None);
+                        let mut success = true;
+                        
+                        for i in 0u16..400 {
+                            let ctid = wackdb_storage::CTID {
+                                page_id: wackdb_storage::PageId { file_id: i as u32, page_num: i as u32 },
+                                slot_idx: i,
+                            };
+                            if let Err(e) = btree.insert(i as i32, ctid) {
+                                logs.push(format!("Error inserting key {}: {:?}", i, e));
+                                success = false;
+                                break;
+                            }
+                        }
+                        
+                        if success {
+                            logs.push("Successfully inserted 400 keys and triggered split!".to_string());
+                            let val_0 = btree.search(0);
+                            let val_399 = btree.search(399);
+                            logs.push(format!("Search Key 0 -> {:?}", val_0));
+                            logs.push(format!("Search Key 399 -> {:?}", val_399));
+                        }
+                    } else {
+                        logs.push(format!("Executing: {}", text));
+                        let mut p = parser::Parser::new(text);
+                        match p.parse() {
+                            Ok(ast) => logs.push(format!("Parsed AST: {:?}", ast)),
+                            Err(e) => logs.push(format!("Parse Error: {}", e)),
+                        }
                     }
                     
                     textarea = TextArea::default();
