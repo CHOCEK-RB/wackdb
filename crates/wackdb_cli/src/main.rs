@@ -5,17 +5,18 @@
 
 use clap::Parser;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
-    Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     widgets::{Block, Borders, Paragraph},
+    Terminal,
 };
+use ratatui_textarea::{Input, Key, TextArea};
 use std::path::Path;
 use std::{error::Error, io};
 use wackdb_buffer::buffer_pool::BufferPoolManager;
@@ -73,8 +74,15 @@ fn run_app<B: Backend, D: wackdb_storage::DiskManager<8192>>(
 where
     <B as Backend>::Error: 'static,
 {
-    let mut input = String::new();
     let mut logs = vec![format!("Connected to WackDB at: {}", db_path)];
+
+    let mut textarea = TextArea::default();
+    textarea.set_block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("SQL Input (Enter to Execute)")
+            .style(Style::default().fg(Color::LightGreen)),
+    );
 
     loop {
         terminal.draw(|f| {
@@ -91,10 +99,7 @@ where
                 )
                 .split(f.area());
 
-            let input_widget = Paragraph::new(format!("> {}", input))
-                .style(Style::default().fg(Color::Yellow))
-                .block(Block::default().borders(Borders::ALL).title("SQL Input"));
-            f.render_widget(input_widget, chunks[0]);
+            f.render_widget(&textarea, chunks[0]);
 
             let metrics_widget = Paragraph::new(format!(
                 "Hit Rate: {:.2}% | Total Hits: {} | Total Misses: {}",
@@ -115,32 +120,34 @@ where
             f.render_widget(logs_widget, chunks[2]);
         })?;
 
-        if let Event::Key(key) = event::read()? {
-            match key.code {
-                KeyCode::Char(c) => {
-                    input.push(c);
+        let event = event::read()?;
+        match event.into() {
+            Input { key: Key::Esc, .. } => return Ok(()),
+            Input { key: Key::Enter, .. } => {
+                let text = textarea.lines().join("\n");
+                let text = text.trim();
+                if text == "exit" || text == "quit" {
+                    return Ok(());
                 }
-                KeyCode::Backspace => {
-                    input.pop();
-                }
-                KeyCode::Enter => {
-                    if input.trim() == "exit" || input.trim() == "quit" {
-                        return Ok(());
-                    }
-
-                    logs.push(format!("Executing: {}", input));
-                    let mut p = parser::Parser::new(&input);
+                if !text.is_empty() {
+                    logs.push(format!("Executing: {}", text));
+                    let mut p = parser::Parser::new(text);
                     match p.parse() {
                         Ok(ast) => logs.push(format!("Parsed AST: {:?}", ast)),
                         Err(e) => logs.push(format!("Parse Error: {}", e)),
                     }
-
-                    input.clear();
+                    
+                    textarea = TextArea::default();
+                    textarea.set_block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title("SQL Input (Enter to Execute)")
+                            .style(Style::default().fg(Color::LightGreen)),
+                    );
                 }
-                KeyCode::Esc => {
-                    return Ok(());
-                }
-                _ => {}
+            }
+            input => {
+                textarea.input(input);
             }
         }
     }
