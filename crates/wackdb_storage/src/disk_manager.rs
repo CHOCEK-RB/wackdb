@@ -133,8 +133,8 @@ impl<const PAGE_SIZE: usize> DiskManager<PAGE_SIZE> for BasicDiskManager<PAGE_SI
     }
 
     fn deallocate_page(&self, _page_id: PageId) {
-        // Space reuse is typically handled by a Free Space Map (FSM) in Postgres.
-        // For simplicity in this educational DBMS, we leave it as a no-op initially.
+        // Space reuse is typically handled by a Free Space Map (FSM)
+        // For simplicity in this educational DBMS, we leave it as a no-op initially
     }
 }
 
