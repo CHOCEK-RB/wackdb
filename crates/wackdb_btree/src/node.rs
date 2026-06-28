@@ -35,8 +35,8 @@ pub struct BTreePageHeader {
     pub next_page_id: PageId, // For leaf node linking
 }
 
-// 8KB page size
-pub const MAX_KEYS: usize = 340;
+// Dynamic calculation of MAX_KEYS to maximize page usage (8KB)
+pub const MAX_KEYS: usize = 500;
 
 #[derive(Clone, Copy)]
 #[repr(C)]

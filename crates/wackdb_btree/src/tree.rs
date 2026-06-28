@@ -32,17 +32,24 @@ pub enum BTreeError {
 pub struct BTreeIndex<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> {
     buffer_pool: &'a BufferPoolManager<PAGE_SIZE, D>,
     root_page_id: parking_lot::RwLock<Option<PageId>>,
+    index_file_id: u32,
 }
 
 impl<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BTreeIndex<'a, PAGE_SIZE, D> {
     pub fn new(
         buffer_pool: &'a BufferPoolManager<PAGE_SIZE, D>,
         root_page_id: Option<PageId>,
+        index_file_id: u32,
     ) -> Self {
         Self {
             buffer_pool,
             root_page_id: parking_lot::RwLock::new(root_page_id),
+            index_file_id,
         }
+    }
+
+    pub fn get_root_page_id(&self) -> Option<PageId> {
+        *self.root_page_id.read()
     }
 
     pub fn insert(&self, key: KeyType, value: ValueType) -> Result<(), BTreeError> {
@@ -50,7 +57,7 @@ impl<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BTreeIndex<'a, PAGE_
         let root_id = *root_lock;
         if root_id.is_none() {
             // Create root leaf page
-            let (frame_id, root_page_id) = self.buffer_pool.new_page(0)?;
+            let (frame_id, root_page_id) = self.buffer_pool.new_page(self.index_file_id)?;
             let mut page_data = self.buffer_pool.write_page(frame_id);
             let leaf = unsafe { &mut *(page_data.data.as_mut_ptr() as *mut LeafNode) };
 
@@ -183,34 +190,45 @@ impl<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BTreeIndex<'a, PAGE_
         let _ = self.buffer_pool.unpin_page(leaf_page_id, true);
         let _ = self.buffer_pool.unpin_page(rs_page_id, true);
 
+        self.insert_into_parent(leaf_page_id, promote_key, rs_page_id, parent_id)
+    }
+
+    #[allow(clippy::needless_range_loop, clippy::too_many_lines)]
+    fn insert_into_parent(
+        &self,
+        old_node_id: PageId,
+        key: KeyType,
+        new_node_id: PageId,
+        parent_id: PageId,
+    ) -> Result<(), BTreeError> {
         if parent_id == INVALID_PAGE_ID {
-            // Create a new root!
-            let (root_frame, new_root_id) = self.buffer_pool.new_page(leaf_page_id.file_id)?;
+            // Create a new root
+            let (root_frame, new_root_id) = self.buffer_pool.new_page(old_node_id.file_id)?;
             let mut root_data = self.buffer_pool.write_page(root_frame);
             let root = unsafe { &mut *(root_data.data.as_mut_ptr() as *mut InternalNode) };
 
             root.header.node_type = NodeType::Internal as u8;
-            root.header.max_keys = leaf.header.max_keys; // Simplified
+            root.header.max_keys = crate::node::MAX_KEYS as u16;
             root.header.num_keys = 1;
             root.header.parent_page_id = INVALID_PAGE_ID;
-            root.keys[0] = promote_key;
-            root.children[0] = leaf_page_id;
-            root.children[1] = rs_page_id;
+            root.keys[0] = key;
+            root.children[0] = old_node_id;
+            root.children[1] = new_node_id;
 
             // Update children's parent pointers
-            let leaf_frame = self.buffer_pool.fetch_page(leaf_page_id)?;
-            let mut leaf_data = self.buffer_pool.write_page(leaf_frame);
-            let leaf = unsafe { &mut *(leaf_data.data.as_mut_ptr() as *mut LeafNode) };
-            leaf.header.parent_page_id = new_root_id;
-            drop(leaf_data);
-            let _ = self.buffer_pool.unpin_page(leaf_page_id, true);
+            let old_frame = self.buffer_pool.fetch_page(old_node_id)?;
+            let mut old_data = self.buffer_pool.write_page(old_frame);
+            let old_header = unsafe { &mut *(old_data.data.as_mut_ptr() as *mut BTreePageHeader) };
+            old_header.parent_page_id = new_root_id;
+            drop(old_data);
+            let _ = self.buffer_pool.unpin_page(old_node_id, true);
 
-            let rs_frame = self.buffer_pool.fetch_page(rs_page_id)?;
-            let mut rs_data = self.buffer_pool.write_page(rs_frame);
-            let rs_leaf = unsafe { &mut *(rs_data.data.as_mut_ptr() as *mut LeafNode) };
-            rs_leaf.header.parent_page_id = new_root_id;
-            drop(rs_data);
-            let _ = self.buffer_pool.unpin_page(rs_page_id, true);
+            let new_frame = self.buffer_pool.fetch_page(new_node_id)?;
+            let mut new_data = self.buffer_pool.write_page(new_frame);
+            let new_header = unsafe { &mut *(new_data.data.as_mut_ptr() as *mut BTreePageHeader) };
+            new_header.parent_page_id = new_root_id;
+            drop(new_data);
+            let _ = self.buffer_pool.unpin_page(new_node_id, true);
 
             drop(root_data);
             let _ = self.buffer_pool.unpin_page(new_root_id, true);
@@ -220,11 +238,103 @@ impl<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BTreeIndex<'a, PAGE_
             return Ok(());
         }
 
-        // Parent insertion logic (Internal node split not fully implemented yet)
-        // For Week 10 requirements, single level split is often enough for testing.
-        Err(BTreeError::BufferError(
-            wackdb_buffer::BufferError::NoFreeFrames,
-        )) // Or custom unhandled split error
+        let parent_frame = self.buffer_pool.fetch_page(parent_id)?;
+        let mut parent_data = self.buffer_pool.write_page(parent_frame);
+        let parent = unsafe { &mut *(parent_data.data.as_mut_ptr() as *mut InternalNode) };
+
+        let num_keys = parent.header.num_keys as usize;
+
+        if num_keys < parent.header.max_keys as usize {
+            let mut insert_idx = num_keys;
+            for i in 0..num_keys {
+                if parent.keys[i] > key {
+                    insert_idx = i;
+                    break;
+                }
+            }
+
+            for i in (insert_idx..num_keys).rev() {
+                parent.keys[i + 1] = parent.keys[i];
+                parent.children[i + 2] = parent.children[i + 1];
+            }
+            parent.keys[insert_idx] = key;
+            parent.children[insert_idx + 1] = new_node_id;
+            parent.header.num_keys += 1;
+
+            drop(parent_data);
+            let _ = self.buffer_pool.unpin_page(parent_id, true);
+            return Ok(());
+        }
+
+        // Split internal node
+        let (rs_frame, rs_page_id) = self.buffer_pool.new_page(parent_id.file_id)?;
+        let mut rs_data = self.buffer_pool.write_page(rs_frame);
+        let rs_internal = unsafe { &mut *(rs_data.data.as_mut_ptr() as *mut InternalNode) };
+
+        rs_internal.header.node_type = NodeType::Internal as u8;
+        rs_internal.header.max_keys = parent.header.max_keys;
+        rs_internal.header.parent_page_id = parent.header.parent_page_id;
+
+        // Temporarily store all keys and children
+        let mut temp_keys = Vec::with_capacity(num_keys + 1);
+        let mut temp_children = Vec::with_capacity(num_keys + 2);
+
+        for i in 0..num_keys {
+            temp_keys.push(parent.keys[i]);
+            temp_children.push(parent.children[i]);
+        }
+        temp_children.push(parent.children[num_keys]);
+
+        let mut insert_idx = num_keys;
+        for i in 0..num_keys {
+            if temp_keys[i] > key {
+                insert_idx = i;
+                break;
+            }
+        }
+        temp_keys.insert(insert_idx, key);
+        temp_children.insert(insert_idx + 1, new_node_id);
+
+        let total_keys = temp_keys.len();
+        let mid = total_keys / 2;
+
+        parent.header.num_keys = mid as u16;
+        for i in 0..mid {
+            parent.keys[i] = temp_keys[i];
+            parent.children[i] = temp_children[i];
+        }
+        parent.children[mid] = temp_children[mid];
+
+        let promote_key = temp_keys[mid];
+
+        let rs_num_keys = total_keys - mid - 1;
+        rs_internal.header.num_keys = rs_num_keys as u16;
+        for i in 0..rs_num_keys {
+            rs_internal.keys[i] = temp_keys[mid + 1 + i];
+            rs_internal.children[i] = temp_children[mid + 1 + i];
+        }
+        rs_internal.children[rs_num_keys] = temp_children[total_keys];
+
+        let grand_parent_id = parent.header.parent_page_id;
+
+        // Update children's parent pointer to the new right sibling
+        for i in 0..=rs_num_keys {
+            let child_id = rs_internal.children[i];
+            let child_frame = self.buffer_pool.fetch_page(child_id)?;
+            let mut child_data = self.buffer_pool.write_page(child_frame);
+            let child_header =
+                unsafe { &mut *(child_data.data.as_mut_ptr() as *mut BTreePageHeader) };
+            child_header.parent_page_id = rs_page_id;
+            drop(child_data);
+            let _ = self.buffer_pool.unpin_page(child_id, true);
+        }
+
+        drop(parent_data);
+        drop(rs_data);
+        let _ = self.buffer_pool.unpin_page(parent_id, true);
+        let _ = self.buffer_pool.unpin_page(rs_page_id, true);
+
+        self.insert_into_parent(parent_id, promote_key, rs_page_id, grand_parent_id)
     }
 
     fn find_leaf_page(&self, key: KeyType) -> Result<Option<(usize, PageId)>, BTreeError> {
@@ -392,7 +502,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let disk = BasicDiskManager::<TEST_PAGE_SIZE>::new(dir.path()).unwrap();
         let buffer = BufferPoolManager::new(10, disk);
-        let mut btree = BTreeIndex::new(&buffer, None);
+        let mut btree = BTreeIndex::new(&buffer, None, 1);
 
         let ctid1 = wackdb_storage::CTID {
             page_id: wackdb_storage::PageId {
@@ -423,7 +533,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let disk = BasicDiskManager::<TEST_PAGE_SIZE>::new(dir.path()).unwrap();
         let buffer = BufferPoolManager::new(50, disk);
-        let mut btree = BTreeIndex::new(&buffer, None);
+        let mut btree = BTreeIndex::new(&buffer, None, 1);
 
         // Insert enough to trigger a split. Max keys is 340 for 8KB.
         for i in 0u16..400 {
@@ -443,5 +553,116 @@ mod tests {
 
         let val_399 = crate::traits::Index::search(&btree, 399).unwrap();
         assert_eq!(val_399.page_id.file_id, 399);
+    }
+
+    #[test]
+    fn test_btree_internal_split() {
+        let dir = tempdir().unwrap();
+        let disk = BasicDiskManager::<TEST_PAGE_SIZE>::new(dir.path()).unwrap();
+        let buffer = BufferPoolManager::new(2000, disk); // Lots of frames so we don't evict too aggressively while keeping references, wait, we don't hold them all. 2000 is enough.
+        let mut btree = BTreeIndex::new(&buffer, None, 1);
+
+        // We need to insert enough elements to cause an internal node split.
+        // MAX_KEYS is 340.
+        // Each leaf split gives ~170 keys per leaf.
+        // So 341 leaf splits * ~170 = ~57,970 elements.
+        let total_elements = 60_000;
+        for i in 0..total_elements {
+            let ctid = wackdb_storage::CTID {
+                page_id: wackdb_storage::PageId {
+                    file_id: i as u32,
+                    page_num: i as u32,
+                },
+                slot_idx: (i % 100) as u16,
+            };
+            crate::traits::Index::insert(&mut btree, i, ctid).unwrap();
+        }
+
+        // Let's verify a few elements to ensure the tree is intact.
+        let val_0 = crate::traits::Index::search(&btree, 0).unwrap();
+        assert_eq!(val_0.page_id.file_id, 0);
+
+        let val_half = crate::traits::Index::search(&btree, 30_000).unwrap();
+        assert_eq!(val_half.page_id.file_id, 30_000);
+
+        let val_last = crate::traits::Index::search(&btree, 59_999).unwrap();
+        assert_eq!(val_last.page_id.file_id, 59_999);
+    }
+
+    #[test]
+    fn test_btree_delete() {
+        let dir = tempdir().unwrap();
+        let disk = BasicDiskManager::<TEST_PAGE_SIZE>::new(dir.path()).unwrap();
+        let buffer = BufferPoolManager::new(10, disk);
+        let mut btree = BTreeIndex::new(&buffer, None, 1);
+
+        let ctid1 = wackdb_storage::CTID {
+            page_id: wackdb_storage::PageId {
+                file_id: 1,
+                page_num: 1,
+            },
+            slot_idx: 1,
+        };
+        let ctid2 = wackdb_storage::CTID {
+            page_id: wackdb_storage::PageId {
+                file_id: 2,
+                page_num: 2,
+            },
+            slot_idx: 2,
+        };
+
+        crate::traits::Index::insert(&mut btree, 10, ctid1).unwrap();
+        crate::traits::Index::insert(&mut btree, 20, ctid2).unwrap();
+
+        // Search success
+        assert_eq!(crate::traits::Index::search(&btree, 10).unwrap(), ctid1);
+
+        // Delete
+        crate::traits::Index::delete(&mut btree, 10).unwrap();
+
+        // Search should fail
+        assert!(crate::traits::Index::search(&btree, 10).is_err());
+
+        // But 20 should still exist
+        assert_eq!(crate::traits::Index::search(&btree, 20).unwrap(), ctid2);
+    }
+
+    #[test]
+    fn test_btree_persistence() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+
+        let ctid1 = wackdb_storage::CTID {
+            page_id: wackdb_storage::PageId {
+                file_id: 1,
+                page_num: 1,
+            },
+            slot_idx: 1,
+        };
+
+        let root_id;
+
+        // Scope 1: Create, insert, and close
+        {
+            let disk = BasicDiskManager::<TEST_PAGE_SIZE>::new(&db_path).unwrap();
+            let buffer = BufferPoolManager::new(10, disk);
+            let mut btree = BTreeIndex::new(&buffer, None, 1);
+
+            crate::traits::Index::insert(&mut btree, 10, ctid1).unwrap();
+            root_id = *btree.root_page_id.read();
+
+            // Force flush buffer pool
+            buffer.flush_all_pages().unwrap();
+        }
+
+        // Scope 2: Reopen and search
+        {
+            let disk = BasicDiskManager::<TEST_PAGE_SIZE>::new(&db_path).unwrap();
+            let buffer = BufferPoolManager::new(10, disk);
+            let btree = BTreeIndex::new(&buffer, root_id, 1);
+
+            let result = crate::traits::Index::search(&btree, 10).unwrap();
+            assert_eq!(result, ctid1);
+        }
     }
 }

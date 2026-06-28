@@ -235,6 +235,13 @@ impl<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BufferPoolManager<PAGE_S
     }
 }
 
+impl<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> Drop for BufferPoolManager<PAGE_SIZE, D> {
+    fn drop(&mut self) {
+        // Automatically flush all dirty pages when the system shuts down or the buffer pool is dropped.
+        let _ = self.flush_all_pages();
+    }
+}
+
 #[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
