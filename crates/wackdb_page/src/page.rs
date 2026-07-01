@@ -4,10 +4,28 @@ use std::mem::size_of;
 type TransactionId = u64;
 const INVALID_TXN_ID: TransactionId = 0;
 
+/// A wrapper to ensure 8-byte alignment for the page buffer.
+/// This prevents SIGSEGV when casting the page data to types with strict alignment requirements (like `BTree` Nodes).
+#[repr(C, align(8))]
+pub struct Align8<const N: usize>(pub [u8; N]);
+
+impl<const N: usize> std::ops::Deref for Align8<N> {
+    type Target = [u8; N];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<const N: usize> std::ops::DerefMut for Align8<N> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 /// Represents a physical memory page formatted with slotted architecture for variable-length records.
 pub struct SlottedPage<const PAGE_SIZE: usize> {
-    /// The raw byte array representing the physical page.
-    pub data: Box<[u8; PAGE_SIZE]>,
+    /// The raw byte array representing the physical page, safely aligned to 8 bytes.
+    pub data: Box<Align8<PAGE_SIZE>>,
 }
 
 impl<const PAGE_SIZE: usize> Default for SlottedPage<PAGE_SIZE> {
@@ -21,7 +39,7 @@ impl<const PAGE_SIZE: usize> SlottedPage<PAGE_SIZE> {
     #[must_use]
     pub fn new() -> Self {
         let mut page = Self {
-            data: Box::new([0; PAGE_SIZE]),
+            data: Box::new(Align8([0; PAGE_SIZE])),
         };
         page.init();
         page
@@ -95,6 +113,11 @@ impl<const PAGE_SIZE: usize> SlottedPage<PAGE_SIZE> {
         let start = slot.offset as usize;
         let header_end = start + size_of::<TupleHeader>();
         let end = start + slot.length as usize;
+
+        // Prevent panic if reading corrupted or incompatible page data
+        if end > PAGE_SIZE || header_end > end {
+            return None;
+        }
 
         let tuple_header =
             unsafe { std::ptr::read_unaligned(self.data[start..].as_ptr().cast::<TupleHeader>()) };
