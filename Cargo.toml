@@ -4,7 +4,7 @@ members = ["crates/wackdb_btree",
   "crates/wackdb_buffer", "crates/wackdb_catalog",
   "crates/wackdb_cli",
   "crates/wackdb_page",
-  "crates/wackdb_storage", "crates/wackdb_tuple",
+  "crates/wackdb_storage", "crates/wackdb_tuple", "crates/wackdb_web",
 ]
 
 [workspace.dependencies]

@@ -1,0 +1,20 @@
+[package]
+name = "wackdb_web"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tower-http = { version = "0.5", features = ["cors"] }
+parking_lot = "0.12"
+wackdb_buffer = { path = "../wackdb_buffer" }
+wackdb_storage = { path = "../wackdb_storage" }
+wackdb_page = { path = "../wackdb_page" }
+wackdb_btree = { path = "../wackdb_btree" }
+hex = "0.4"
+
+[lints]
+workspace = true

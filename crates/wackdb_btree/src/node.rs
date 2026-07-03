@@ -6,8 +6,12 @@ use wackdb_storage::PageId;
 pub enum BTreeError {
     #[error("Node is full")]
     NodeFull,
+    #[error("Duplicate key")]
+    DuplicateKey,
     #[error("Key not found")]
     KeyNotFound,
+    #[error("Invalid node")]
+    InvalidNode,
 }
 
 pub const INVALID_PAGE_ID: PageId = PageId {

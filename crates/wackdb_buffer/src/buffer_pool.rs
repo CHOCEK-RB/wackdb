@@ -71,6 +71,20 @@ impl<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BufferPoolManager<PAGE_S
         self.misses.load(Ordering::SeqCst)
     }
 
+    /// Returns metadata about all frames for debugging or visualization.
+    pub fn get_frames_metadata(&self) -> Vec<(usize, Option<PageId>, usize, bool)> {
+        self.descriptors
+            .iter()
+            .enumerate()
+            .map(|(i, desc)| {
+                let pid = *desc.page_id.lock();
+                let pins = desc.pin_count.load(Ordering::SeqCst) as usize;
+                let dirty = desc.is_dirty.load(Ordering::SeqCst);
+                (i, pid, pins, dirty)
+            })
+            .collect()
+    }
+
     /// Prints the physical state of the memory frames to standard output.
     pub fn print_buffer_state(&self) {
         println!("+--------------+------------+-----------+-----------+");

@@ -23,6 +23,8 @@ pub enum BTreeError {
     BufferError(#[from] wackdb_buffer::BufferError),
     #[error("Key not found")]
     KeyNotFound,
+    #[error("Invalid or corrupted node encountered (maybe an unflushed empty page?)")]
+    InvalidNode,
     #[error("Duplicate key")]
     DuplicateKey,
     #[error("Root page not initialized")]
@@ -351,6 +353,9 @@ impl<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>> BTreeIndex<'a, PAGE_
 
             if header.node_type == NodeType::Leaf as u8 {
                 return Ok(Some((frame_id, curr_page_id)));
+            } else if header.node_type != NodeType::Internal as u8 {
+                // If it's neither Leaf nor Internal, the page is corrupted or uninitialized
+                return Err(BTreeError::InvalidNode);
             }
 
             let internal_node = unsafe { &*(page_data.data.as_ptr() as *const InternalNode) };

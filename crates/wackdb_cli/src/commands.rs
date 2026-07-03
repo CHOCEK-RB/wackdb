@@ -24,7 +24,7 @@ pub fn process_command<D: wackdb_storage::DiskManager<8192>>(
             state.log(
                 "  \\demo <count>        - Creates 'demo_users' and generates realistic data.",
             );
-            state.log("  \\select <name>       - Scans and prints data from a table (Volcano Model preview).");
+            state.log("  \\select <name>       - Prints data from a table.");
             state.log("  \\search <key>        - Searches for a specific key in the active table's B+Tree.");
             state.log("  \\delete <key>        - Deletes a key from the active table's B+Tree.");
             state.log("  \\stats               - Displays detailed system statistics.");
@@ -275,7 +275,7 @@ fn process_select<D: wackdb_storage::DiskManager<8192>>(
         file_id: meta.index_relation_id,
         page_num: num,
     });
-    
+
     let mut printed = 0;
 
     state.log(format!("--- Data for table '{}' ---", table_name));
