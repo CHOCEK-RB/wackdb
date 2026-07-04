@@ -1686,6 +1686,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "wackdb_catalog"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "wackdb_cli"
 version = "0.1.0"
 dependencies = [
@@ -1696,8 +1706,10 @@ dependencies = [
  "tempfile",
  "wackdb_btree",
  "wackdb_buffer",
+ "wackdb_catalog",
  "wackdb_page",
  "wackdb_storage",
+ "wackdb_tuple",
 ]
 
 [[package]]
@@ -1714,6 +1726,13 @@ version = "0.1.0"
 dependencies = [
  "parking_lot",
  "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "wackdb_tuple"
+version = "0.1.0"
+dependencies = [
  "thiserror 2.0.18",
 ]
 
