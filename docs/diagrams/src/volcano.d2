@@ -1,0 +1,76 @@
+direction: right
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+title: |md
+  ## Volcano Execution Model (wackdb_query)
+  Data pipelining via `next() -> Option<Tuple>`
+| {shape: text}
+
+QueryEngine: {
+  shape: package
+  
+  ExecutorTrait: "trait Executor" {
+    shape: class
+    +next(): "Option<Tuple>"
+  }
+  
+  SeqScan: "SeqScan\n(Sequential Scan)" {
+    shape: class
+    +next(): "Option<Tuple>"
+  }
+  
+  IndexScan: "IndexScan\n(B+Tree Scan)" {
+    shape: class
+    +next(): "Option<Tuple>"
+  }
+  
+  Select: "Select\n(Filter / WHERE)" {
+    shape: class
+    +child: Box<dyn Executor>
+    +predicate: Expr
+    +next(): "Option<Tuple>"
+  }
+  
+  Project: "Project\n(SELECT cols)" {
+    shape: class
+    +child: Box<dyn Executor>
+    +next(): "Option<Tuple>"
+  }
+  
+  NestedLoopJoin: "NestedLoopJoin\n(JOIN)" {
+    shape: class
+    +left: Box<dyn Executor>
+    +right: Box<dyn Executor>
+    +next(): "Option<Tuple>"
+  }
+
+  ExternalMergeSort: "ExternalMergeSort\n(ORDER BY)" {
+    shape: class
+    +child: Box<dyn Executor>
+    +next(): "Option<Tuple>"
+  }
+}
+
+QueryEngine.SeqScan -> QueryEngine.ExecutorTrait: "impl"
+QueryEngine.IndexScan -> QueryEngine.ExecutorTrait: "impl"
+QueryEngine.Select -> QueryEngine.ExecutorTrait: "impl"
+QueryEngine.Project -> QueryEngine.ExecutorTrait: "impl"
+QueryEngine.NestedLoopJoin -> QueryEngine.ExecutorTrait: "impl"
+QueryEngine.ExternalMergeSort -> QueryEngine.ExecutorTrait: "impl"
+
+ExamplePipeline: "Pipeline Flow Example: SELECT name FROM users WHERE id > 10" {
+  style.fill: transparent
+  
+  project: "Project\n(name)" { shape: step }
+  select: "Select\n(id > 10)" { shape: step }
+  scan: "IndexScan\n(users B+Tree)" { shape: step }
+  
+  project -> select: "1. calls next()"
+  select -> scan: "2. calls next()"
+  scan -> select: "3. yields Tuple\n{id: 11, name: 'Alice'}" { style.animated: true; style.stroke: "#555" }
+  select -> project: "4. yields Tuple\n{id: 11, name: 'Alice'}" { style.animated: true; style.stroke: "#555" }
+}

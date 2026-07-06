@@ -1,0 +1,61 @@
+direction: right
+
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+classes: {
+  struct: {
+    shape: class
+    style: { border-radius: 4 }
+  }
+  external: {
+    style: { stroke-dash: 5; opacity: 0.7 }
+  }
+}
+
+wackdb_query: {
+  Optimizer: {
+    class: struct
+    +optimize(ast: Ast): Plan
+  }
+  
+  ExecutorTrait: {
+    shape: class
+    +next(): "Option<Tuple>"
+  }
+
+  SeqScan: { class: struct }
+  IndexScan: { class: struct }
+  Select: { class: struct }
+  Project: { class: struct }
+  NestedLoopJoin: { class: struct }
+  ExternalMergeSort: { class: struct }
+  
+  PredicateEvaluator: {
+    class: struct
+    +evaluate(cond: WhereCondition, tuple: Tuple): bool
+  }
+
+  SeqScan -> ExecutorTrait: "impl"
+  IndexScan -> ExecutorTrait: "impl"
+  Select -> ExecutorTrait: "impl"
+  Project -> ExecutorTrait: "impl"
+  NestedLoopJoin -> ExecutorTrait: "impl"
+  ExternalMergeSort -> ExecutorTrait: "impl"
+
+  Optimizer -> SeqScan: "Builds physical plan"
+  Select -> PredicateEvaluator: "Uses for filtering"
+}
+
+wackdb_sql: { class: external }
+wackdb_catalog: { class: external }
+wackdb_buffer: { class: external }
+wackdb_tuple: { class: external }
+
+wackdb_sql -> wackdb_query.Optimizer: "Provides AST"
+wackdb_query -> wackdb_catalog: "Looks up metadata"
+wackdb_query -> wackdb_buffer: "Iterates pages"
+wackdb_query -> wackdb_tuple: "Yields results"
