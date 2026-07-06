@@ -100,9 +100,9 @@ where
     let disk_manager = BasicDiskManager::<8192>::new(Path::new(data_dir))?;
     // Set buffer pool size to 64 frames (~512 KB) so that large insertions trigger LRU eviction
     let bpm = BufferPoolManager::new(64, disk_manager);
-    
+
     let shared_bpm = std::sync::Arc::new(parking_lot::RwLock::new(bpm));
-    
+
     let bpm_clone = shared_bpm.clone();
     let data_dir_clone = data_dir.to_string();
     std::thread::spawn(move || {
