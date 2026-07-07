@@ -1,0 +1,21 @@
+[package]
+name = "wackdb_query"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wackdb_storage = { path = "../wackdb_storage" }
+wackdb_page = { path = "../wackdb_page" }
+wackdb_buffer = { path = "../wackdb_buffer" }
+wackdb_tuple = { path = "../wackdb_tuple" }
+wackdb_btree = { path = "../wackdb_btree" }
+tempfile = { workspace = true }
+
+thiserror = { workspace = true }
+serde_json = { workspace = true }
+wackdb_sql = { version = "0.1.0", path = "../wackdb_sql" }
+
+[dev-dependencies]
+
+[lints]
+workspace = true
