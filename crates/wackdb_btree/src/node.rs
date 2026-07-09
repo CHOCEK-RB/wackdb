@@ -1,4 +1,9 @@
 #![allow(missing_docs)]
+#![allow(trivial_casts)]
+#![allow(clippy::ptr_as_ptr)]
+#![allow(clippy::ref_as_ptr)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::cast_possible_truncation)]
 use thiserror::Error;
 use wackdb_storage::PageId;
 
@@ -30,7 +35,7 @@ pub enum NodeType {
 }
 
 #[derive(Debug, Clone, Copy)]
-#[repr(C)]
+#[repr(C, align(4))]
 pub struct BTreePageHeader {
     pub node_type: u8, // Casted from NodeType
     pub num_keys: u16,
@@ -39,82 +44,106 @@ pub struct BTreePageHeader {
     pub next_page_id: PageId, // For leaf node linking
 }
 
-// Dynamic calculation of MAX_KEYS to maximize page usage (8KB)
-pub const MAX_KEYS: usize = 500;
-
 #[derive(Clone, Copy)]
-#[repr(C)]
+#[repr(C, align(4))]
 pub struct LeafNode {
     pub header: BTreePageHeader,
-    pub keys: [KeyType; MAX_KEYS],
-    pub values: [ValueType; MAX_KEYS],
 }
 
 #[derive(Clone, Copy)]
-#[repr(C)]
+#[repr(C, align(4))]
 pub struct InternalNode {
     pub header: BTreePageHeader,
-    pub keys: [KeyType; MAX_KEYS],
-    pub children: [PageId; MAX_KEYS + 1],
 }
 
-#[allow(clippy::indexing_slicing)]
+#[must_use]
+pub const fn leaf_max_keys(page_size: usize) -> u16 {
+    let header_size = std::mem::size_of::<BTreePageHeader>();
+    let pair_size = std::mem::size_of::<KeyType>() + std::mem::size_of::<ValueType>();
+    ((page_size - header_size) / pair_size) as u16
+}
+
+#[must_use]
+pub const fn internal_max_keys(page_size: usize) -> u16 {
+    let header_size = std::mem::size_of::<BTreePageHeader>();
+    let pair_size = std::mem::size_of::<KeyType>() + std::mem::size_of::<PageId>();
+    ((page_size - header_size - std::mem::size_of::<PageId>()) / pair_size) as u16
+}
+
 impl LeafNode {
-    #[must_use]
-    pub fn new(max_keys: u16) -> Self {
-        Self {
-            header: BTreePageHeader {
-                node_type: NodeType::Leaf as u8,
-                num_keys: 0,
-                max_keys,
-                parent_page_id: INVALID_PAGE_ID,
-                next_page_id: INVALID_PAGE_ID,
-            },
-            keys: [0; MAX_KEYS],
-            values: [wackdb_storage::CTID::default(); MAX_KEYS],
+    pub fn keys_mut(&mut self) -> &mut [KeyType] {
+        let max_keys = self.header.max_keys as usize;
+        unsafe {
+            let ptr = (self as *mut Self).add(1) as *mut KeyType;
+            std::slice::from_raw_parts_mut(ptr, max_keys)
         }
     }
 
-    /// # Errors
-    /// Returns `BTreeError::NodeFull` if the leaf node is full.
-    pub fn insert(&mut self, key: KeyType, value: ValueType) -> Result<(), BTreeError> {
-        if self.header.num_keys >= self.header.max_keys {
-            return Err(BTreeError::NodeFull); // Node is full
+    pub fn keys_and_values_mut(&mut self) -> (&mut [KeyType], &mut [ValueType]) {
+        let max_keys = self.header.max_keys as usize;
+        unsafe {
+            let keys_ptr = (self as *mut Self).add(1) as *mut KeyType;
+            let values_ptr = keys_ptr.add(max_keys) as *mut ValueType;
+            (
+                std::slice::from_raw_parts_mut(keys_ptr, max_keys),
+                std::slice::from_raw_parts_mut(values_ptr, max_keys),
+            )
         }
+    }
 
-        let num_keys = self.header.num_keys as usize;
-        let mut idx = 0;
-        while idx < num_keys && self.keys[idx] < key {
-            idx += 1;
+    pub fn keys(&self) -> &[KeyType] {
+        let max_keys = self.header.max_keys as usize;
+        unsafe {
+            let ptr = (self as *const Self).add(1) as *const KeyType;
+            std::slice::from_raw_parts(ptr, max_keys)
         }
+    }
 
-        // Shift elements to make room
-        if idx < num_keys {
-            self.keys.copy_within(idx..num_keys, idx + 1);
-            self.values.copy_within(idx..num_keys, idx + 1);
+    pub fn values(&self) -> &[ValueType] {
+        let max_keys = self.header.max_keys as usize;
+        unsafe {
+            let keys_ptr = (self as *const Self).add(1) as *const KeyType;
+            let values_ptr = keys_ptr.add(max_keys) as *const ValueType;
+            std::slice::from_raw_parts(values_ptr, max_keys)
         }
-
-        self.keys[idx] = key;
-        self.values[idx] = value;
-        self.header.num_keys += 1;
-
-        Ok(())
     }
 }
 
 impl InternalNode {
-    #[must_use]
-    pub fn new(max_keys: u16) -> Self {
-        Self {
-            header: BTreePageHeader {
-                node_type: NodeType::Internal as u8,
-                num_keys: 0,
-                max_keys,
-                parent_page_id: INVALID_PAGE_ID,
-                next_page_id: INVALID_PAGE_ID,
-            },
-            keys: [0; MAX_KEYS],
-            children: [INVALID_PAGE_ID; MAX_KEYS + 1],
+    pub fn keys_mut(&mut self) -> &mut [KeyType] {
+        let max_keys = self.header.max_keys as usize;
+        unsafe {
+            let ptr = (self as *mut Self).add(1) as *mut KeyType;
+            std::slice::from_raw_parts_mut(ptr, max_keys)
+        }
+    }
+
+    pub fn keys_and_children_mut(&mut self) -> (&mut [KeyType], &mut [PageId]) {
+        let max_keys = self.header.max_keys as usize;
+        unsafe {
+            let keys_ptr = (self as *mut Self).add(1) as *mut KeyType;
+            let children_ptr = keys_ptr.add(max_keys) as *mut PageId;
+            (
+                std::slice::from_raw_parts_mut(keys_ptr, max_keys),
+                std::slice::from_raw_parts_mut(children_ptr, max_keys + 1),
+            )
+        }
+    }
+
+    pub fn keys(&self) -> &[KeyType] {
+        let max_keys = self.header.max_keys as usize;
+        unsafe {
+            let ptr = (self as *const Self).add(1) as *const KeyType;
+            std::slice::from_raw_parts(ptr, max_keys)
+        }
+    }
+
+    pub fn children(&self) -> &[PageId] {
+        let max_keys = self.header.max_keys as usize;
+        unsafe {
+            let keys_ptr = (self as *const Self).add(1) as *const KeyType;
+            let children_ptr = keys_ptr.add(max_keys) as *const PageId;
+            std::slice::from_raw_parts(children_ptr, max_keys + 1)
         }
     }
 }
