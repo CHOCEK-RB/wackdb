@@ -11,7 +11,6 @@ pub struct LRUReplacer {
 
 struct LruState {
     /// Frames ordered by access time (most recent at the back).
-    /// O(N) operations are acceptable given typical buffer pool sizes for educational DBS.
     access_queue: Vec<usize>,
     /// Flags indicating if a specific frame is pinned and thus unevictable.
     is_pinned: Vec<bool>,

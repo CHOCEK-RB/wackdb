@@ -15,11 +15,14 @@ pub mod error;
 /// Memory frame descriptors.
 pub mod frame;
 
+/// Log manager for WAL.
+pub mod log_manager;
 /// LRU page replacement policy.
 pub mod lru;
 /// Buffer pool replacement policies.
 pub mod replacer;
 
 pub use error::BufferError;
+pub use log_manager::LogManager;
 pub use lru::LRUReplacer;
 pub use replacer::ReplacementPolicy;
