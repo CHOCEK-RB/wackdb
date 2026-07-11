@@ -20,6 +20,18 @@ pub trait DiskManager<const PAGE_SIZE: usize>: Send + Sync {
     fn allocate_page(&self, file_id: u32) -> Result<PageId, StorageError>;
     /// Deallocates a physical page. Space reuse should be handled via a free space map.
     fn deallocate_page(&self, page_id: PageId);
+    /// Deletes the underlying physical file and drops the file handle.
+    ///
+    /// # Errors
+    /// Returns error on I/O issues.
+    fn delete_file(&self, file_id: u32) -> Result<(), StorageError>;
+    /// Closes all open file handles
+    fn close_all(&self);
+    /// Returns the total number of pages currently allocated in the specified file.
+    ///
+    /// # Errors
+    /// Returns `StorageError` if the file does not exist or metadata cannot be read.
+    fn get_total_pages(&self, file_id: u32) -> Result<u32, StorageError>;
 }
 
 /// Contains the file descriptor and tracked page count for an open database file.
@@ -135,6 +147,34 @@ impl<const PAGE_SIZE: usize> DiskManager<PAGE_SIZE> for BasicDiskManager<PAGE_SI
     fn deallocate_page(&self, _page_id: PageId) {
         // Space reuse is typically handled by a Free Space Map (FSM)
         // For simplicity in this educational DBMS, we leave it as a no-op initially
+    }
+
+    /// # Errors
+    /// Returns error on I/O issues
+    fn delete_file(&self, file_id: u32) -> Result<(), StorageError> {
+        {
+            let mut handles = self.file_handles.lock();
+            handles.remove(&file_id);
+        }
+        let file_path = self.data_dir.join(file_id.to_string());
+        if file_path.exists() {
+            std::fs::remove_file(file_path)?;
+        }
+        Ok(())
+    }
+
+    fn close_all(&self) {
+        let mut handles = self.file_handles.lock();
+        handles.clear();
+    }
+
+    fn get_total_pages(&self, file_id: u32) -> Result<u32, StorageError> {
+        self.ensure_file_open(file_id)?;
+        let handles = self.file_handles.lock();
+        let handle = handles
+            .get(&file_id)
+            .ok_or(StorageError::FileError(file_id))?;
+        Ok(handle.total_pages.load(Ordering::SeqCst))
     }
 }
 
