@@ -1,0 +1,8 @@
+[package]
+name = "wackdb_wal"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wackdb_buffer = { path = "../wackdb_buffer" }
+thiserror = { workspace = true }
