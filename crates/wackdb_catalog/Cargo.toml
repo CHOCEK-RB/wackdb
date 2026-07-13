@@ -10,6 +10,7 @@ workspace = true
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+wackdb_tuple = { path = "../wackdb_tuple" }
 
 [dev-dependencies]
 tempfile.workspace = true
