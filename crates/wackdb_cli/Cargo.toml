@@ -8,13 +8,19 @@ wackdb_storage = { path = "../wackdb_storage" }
 wackdb_buffer = { path = "../wackdb_buffer" }
 wackdb_page = { path = "../wackdb_page" }
 wackdb_btree = { path = "../wackdb_btree" }
-tempfile = { workspace = true }
-clap = { workspace = true }
-crossterm = { workspace = true }
-ratatui = { workspace = true }
-ratatui-textarea = "0.9.2"
 wackdb_catalog = { version = "0.1.0", path = "../wackdb_catalog" }
 wackdb_tuple = { version = "0.1.0", path = "../wackdb_tuple" }
+wackdb_query = { version = "0.1.0", path = "../wackdb_query" }
+wackdb_wal = { path = "../wackdb_wal" }
 wackdb_web = { path = "../wackdb_web" }
+tempfile = { workspace = true }
+clap = { workspace = true }
 tokio = { version = "1.0", features = ["rt", "rt-multi-thread"] }
 parking_lot = "0.12"
+ctrlc = "3.4"
+serde_json.workspace = true
+serde.workspace = true
+toml.workspace = true
+colored = "3.1.1"
+comfy-table = "7.2.2"
+wackdb_sql = { version = "0.1.0", path = "../wackdb_sql" }
