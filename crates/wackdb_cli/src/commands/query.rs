@@ -5,7 +5,7 @@ use wackdb_btree::tree::BTreeIndex;
 use wackdb_buffer::buffer_pool::BufferPoolManager;
 use wackdb_catalog::Catalog;
 use wackdb_query::executor::predicate::evaluate_where_clause;
-use wackdb_query::{Executor, ExternalMergeSort, NestedLoopJoin, Project, Select};
+use wackdb_query::{Executor, ExternalMergeSort, NestedLoopJoin, HashJoin, Project, Select};
 use wackdb_sql::{Ast, JoinClause, WhereCondition};
 use wackdb_storage::DiskManager;
 use wackdb_tuple::{Schema, value::Value};
@@ -32,15 +32,31 @@ pub fn execute_query<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
         return Err("Not a SELECT statement.".into());
     };
 
+    let base_schema = catalog.get_schema(&table).map_err(|_| "Schema not found")?;
+    let mut base_where = Vec::new();
+    let mut remaining_where = Vec::new();
+
+    for cond in where_clause {
+        if base_schema.columns.iter().any(|c| c.name == cond.left_col) {
+            base_where.push(cond);
+        } else {
+            remaining_where.push(cond);
+        }
+    }
+
     let mut plan = String::new();
-    let mut pipeline = build_base_pipeline(&table, &where_clause, catalog, &*bpm, &mut plan)?;
+    let mut pipeline = build_base_pipeline(&table, &base_where, catalog, &*bpm, &mut plan)?;
+
+    if !base_where.is_empty() {
+        pipeline = build_filter_pipeline(pipeline, base_where, &mut plan)?;
+    }
 
     if !join.is_empty() {
         pipeline = build_join_pipeline(pipeline, &join, catalog, &*bpm, &mut plan)?;
     }
 
-    if !where_clause.is_empty() {
-        pipeline = build_filter_pipeline(pipeline, where_clause, &mut plan)?;
+    if !remaining_where.is_empty() {
+        pipeline = build_filter_pipeline(pipeline, remaining_where, &mut plan)?;
     }
 
     let output_schema = build_projection_schema(&columns, pipeline.schema());
@@ -156,7 +172,6 @@ fn build_join_pipeline<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
             0
         };
 
-        plan.push_str(&format!(" -> NestedLoopJoin({})", j.table));
         let right_exec = wackdb_query::Optimizer::optimize(
             bpm,
             meta2.heap_relation_id,
@@ -168,36 +183,48 @@ fn build_join_pipeline<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
         let left_col_name = j.left_col.clone();
         let right_col_name = j.right_col.clone();
 
-        let pred = Box::new(
-            move |lt: &wackdb_tuple::Tuple,
-                  ls: &Schema,
-                  rt: &wackdb_tuple::Tuple,
-                  rs: &Schema|
-                  -> bool {
-                let Ok(l_vals) = lt.to_values(ls) else {
-                    return false;
-                };
-                let Ok(r_vals) = rt.to_values(rs) else {
-                    return false;
-                };
+        // Heuristic Optimization: Hash Join is much faster but consumes RAM.
+        // We use it if the right table is small (e.g., < 10000 records).
+        if meta2.num_records < 10000 {
+            plan.push_str(&format!(" -> HashJoin({})", j.table));
+            left_pipeline = Box::new(HashJoin::new(
+                left_pipeline,
+                right_exec,
+                left_col_name,
+                right_col_name,
+            ));
+        } else {
+            plan.push_str(&format!(" -> NestedLoopJoin({})", j.table));
+            let pred = Box::new(
+                move |lt: &wackdb_tuple::Tuple,
+                      ls: &Schema,
+                      rt: &wackdb_tuple::Tuple,
+                      rs: &Schema|
+                      -> bool {
+                    let Ok(l_vals) = lt.to_values(ls) else {
+                        return false;
+                    };
+                    let Ok(r_vals) = rt.to_values(rs) else {
+                        return false;
+                    };
 
-                let Some(l_idx) = ls.columns.iter().position(|c| c.name == left_col_name) else {
-                    return false;
-                };
-                let Some(r_idx) = rs.columns.iter().position(|c| c.name == right_col_name) else {
-                    return false;
-                };
+                    let Some(l_idx) = ls.columns.iter().position(|c| c.name == left_col_name) else {
+                        return false;
+                    };
+                    let Some(r_idx) = rs.columns.iter().position(|c| c.name == right_col_name) else {
+                        return false;
+                    };
 
-                match (&l_vals[l_idx], &r_vals[r_idx]) {
-                    (Value::Integer(a), Value::Integer(b)) => a == b,
-                    (Value::Varchar(a), Value::Varchar(b)) => a == b,
-                    (Value::Boolean(a), Value::Boolean(b)) => a == b,
-                    _ => false,
-                }
-            },
-        );
-
-        left_pipeline = Box::new(NestedLoopJoin::new(left_pipeline, right_exec, pred));
+                    match (&l_vals[l_idx], &r_vals[r_idx]) {
+                        (Value::Integer(a), Value::Integer(b)) => a == b,
+                        (Value::Varchar(a), Value::Varchar(b)) => a == b,
+                        (Value::Boolean(a), Value::Boolean(b)) => a == b,
+                        _ => false,
+                    }
+                },
+            );
+            left_pipeline = Box::new(NestedLoopJoin::new(left_pipeline, right_exec, pred));
+        }
     }
 
     Ok(left_pipeline)

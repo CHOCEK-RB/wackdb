@@ -77,6 +77,8 @@ fn execute_insert<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
         catalog.update_root_page(table, Some(r.page_num))?;
     }
 
+    catalog.update_num_records(table, 1)?;
+
     if !quiet {
         println!(
             "{}",
@@ -113,6 +115,10 @@ fn execute_delete<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
             bpm,
             is_recovery,
         )?;
+    }
+
+    if deleted_count > 0 {
+        catalog.update_num_records(table, -(deleted_count as i32))?;
     }
 
     if !quiet {

@@ -14,6 +14,8 @@ pub mod select;
 pub mod seq_scan;
 /// In-memory external merge sort operator.
 pub mod sort;
+/// Hash join operator.
+pub mod hash_join;
 
 pub use index_scan::IndexScan;
 pub use join::NestedLoopJoin;
@@ -22,3 +24,4 @@ pub use project::Project;
 pub use select::Select;
 pub use seq_scan::SeqScan;
 pub use sort::ExternalMergeSort;
+pub use hash_join::HashJoin;

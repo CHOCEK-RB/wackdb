@@ -92,6 +92,10 @@ struct Args {
     /// Path to the data directory (WackDB stores multiple files per relation, not a single file)
     #[arg(short, long, default_value = "wackdb_data")]
     data_dir: String,
+
+    /// Show detailed execution pipeline and buffer pool statistics
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
 }
 
 const PAGE_SIZE: usize = 8192;
@@ -469,6 +473,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     config.query.sort_chunk_size,
                     false,
                     false,
+                    args.verbose,
                 );
                 match cmd_res {
                     Ok(Some(sig)) if sig == ".reset" => {
@@ -536,14 +541,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         "{}",
                                         format!("wackdb ({})> {};", data_dir, stmt).cyan()
                                     );
-                                    let _ = process_command(
+                                    match process_command(
                                         stmt,
                                         &mut catalog,
                                         &mut shared_bpm.write(),
                                         config.query.sort_chunk_size,
                                         false,
                                         false,
-                                    );
+                                        args.verbose,
+                                    ) {
+                                        Ok(telemetry) => {
+                                            if let Some(t) = telemetry {
+                                                println!("{}", t);
+                                            }
+                                        }
+                                        Err(e) => println!("Error: {}", e),
+                                    }
                                 }
                             }
                             Err(e) => println!(
@@ -577,6 +590,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 config.query.sort_chunk_size,
                 false,
                 false,
+                args.verbose,
             ) {
                 Ok(telemetry) => {
                     let duration = start.elapsed();

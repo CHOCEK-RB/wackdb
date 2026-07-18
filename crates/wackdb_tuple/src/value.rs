@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Supported data types in `WackDB`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DataType {
     /// 4-byte signed integer
     Integer,
@@ -12,7 +12,7 @@ pub enum DataType {
 }
 
 /// Represents a scalar value in a tuple.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Value {
     /// Represents an SQL NULL
     Null,

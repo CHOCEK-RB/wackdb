@@ -14,4 +14,7 @@ pub struct TableMetadata {
     pub root_page_num: Option<u32>,
     /// Schema of the table
     pub schema: Schema,
+    /// Number of records in the table
+    #[serde(default)]
+    pub num_records: usize,
 }

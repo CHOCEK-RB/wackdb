@@ -19,6 +19,7 @@ pub fn process_command<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
     sort_chunk_size: usize,
     quiet: bool,
     is_recovery: bool,
+    verbose: bool,
 ) -> Result<Option<String>, Box<dyn std::error::Error>> {
     if cmd.starts_with('.') {
         meta::execute_meta_command(cmd, catalog, bpm)
@@ -60,11 +61,11 @@ pub fn process_command<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
                 };
 
                 let telemetry = format!(
-                    "Telemetry -> Buffer Cache Hits: {}, Cache Misses (Disk I/O): {} (Hit Rate: {:.2}%)\nExecution Plan: {}",
+                    "\n[STATISTICS]\n- Buffer Cache Hits: {}\n- Cache Misses (Disk I/O): {} (Hit Rate: {:.2}%)\n- Execution Pipeline: {}\n",
                     delta_hits, delta_misses, hr, plan
                 );
 
-                if !quiet {
+                if verbose {
                     Ok(Some(telemetry))
                 } else {
                     Ok(None)
@@ -88,10 +89,15 @@ pub fn process_command<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
                 };
 
                 let telemetry = format!(
-                    "Telemetry -> Buffer Cache Hits: {}, Cache Misses (Disk I/O): {} (Hit Rate: {:.2}%)\nExecution Plan: {}",
+                    "\n[STATISTICS]\n- Buffer Cache Hits: {}\n- Cache Misses (Disk I/O): {} (Hit Rate: {:.2}%)\n- Execution Pipeline: {}\n",
                     delta_hits, delta_misses, hr, plan
                 );
-                Ok(Some(telemetry))
+                
+                if verbose {
+                    Ok(Some(telemetry))
+                } else {
+                    Ok(None)
+                }
             }
         }
     }

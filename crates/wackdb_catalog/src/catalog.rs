@@ -95,6 +95,7 @@ impl Catalog {
             index_relation_id: index_id,
             root_page_num: None,
             schema,
+            num_records: 0,
         };
 
         self.data.tables.insert(name.to_string(), meta);
@@ -134,6 +135,27 @@ impl Catalog {
     ) -> Result<(), CatalogError> {
         if let Some(meta) = self.data.tables.get_mut(name) {
             meta.root_page_num = root_page_num;
+            self.flush()?;
+            Ok(())
+        } else {
+            Err(CatalogError::TableNotFound(name.to_string()))
+        }
+    }
+
+    /// Updates the number of records (cardinality) for a given table.
+    /// # Errors
+    /// Returns `CatalogError::TableNotFound` if the table does not exist.
+    pub fn update_num_records(
+        &mut self,
+        name: &str,
+        delta: i32,
+    ) -> Result<(), CatalogError> {
+        if let Some(meta) = self.data.tables.get_mut(name) {
+            if delta < 0 {
+                meta.num_records = meta.num_records.saturating_sub(delta.unsigned_abs() as usize);
+            } else {
+                meta.num_records = meta.num_records.saturating_add(delta as usize);
+            }
             self.flush()?;
             Ok(())
         } else {
