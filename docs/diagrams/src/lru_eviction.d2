@@ -1,0 +1,18 @@
+direction: down
+vars: { d2-config: { theme-id: 301 } }
+
+title: |md
+  ## Proceso de Evicción LRU (Buffer Pool)
+| {shape: text}
+
+step1: "1. Consulta solicita Página X" { shape: step }
+step2: "2. Caché lleno (LRU elige Víctima Y)" { shape: step }
+step3: "3. ¿La Página Y está sucia (Dirty)?" { shape: diamond }
+step4: "4. Volcar (Flush) Página Y al Disco" { shape: step }
+step5: "5. Leer Página X desde Disco al Frame" { shape: step }
+
+step1 -> step2
+step2 -> step3
+step3 -> step4: "Sí"
+step3 -> step5: "No"
+step4 -> step5

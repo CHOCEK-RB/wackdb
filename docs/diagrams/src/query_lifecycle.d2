@@ -1,0 +1,19 @@
+direction: down
+vars: { d2-config: { theme-id: 301 } }
+
+title: |md
+  ## Ciclo de Vida de una Consulta SQL
+| {shape: text}
+
+SQL: "String SQL" { shape: document }
+Parser: "Parser (wackdb_sql)" { shape: rectangle }
+Optimizer: "Optimizador (wackdb_query)" { shape: rectangle }
+Volcano: "Ejecutor Volcano" { shape: rectangle }
+Buffer: "Buffer Pool (wackdb_buffer)" { shape: rectangle }
+Disk: "Disco (wackdb_storage)" { shape: cylinder }
+
+SQL -> Parser: "1. Texto"
+Parser -> Optimizer: "2. AST"
+Optimizer -> Volcano: "3. Plan Físico"
+Volcano -> Buffer: "4. Pide Páginas"
+Buffer -> Disk: "5. I/O (Paginación)"

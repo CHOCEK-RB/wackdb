@@ -1,4 +1,4 @@
-direction: right
+direction: down
 vars: {
   d2-config: {
     theme-id: 301
@@ -14,10 +14,11 @@ slotted_page: "SlottedPage Architecture (wackdb_page)" {
 
 PageHeader: "Struct" {
   shape: sql_table
-  lsn: u64
-  next_free_slot: u16
-  free_space: u16
-  record_count: u16
+  log_sequence_number: u64
+  total_slots: u16
+  free_space_lower: u16
+  free_space_upper: u16
+  page_flags: u16
 }
 
 SlotDirectory: "Array of Slots" {

@@ -1,4 +1,4 @@
-direction: right
+direction: down
 
 vars: {
   d2-config: {
@@ -19,23 +19,21 @@ classes: {
 wackdb_buffer: {
   BufferPoolManager: {
     class: struct
-    "-pool": "Vec<SlottedPage>"
-    "-page_table": "HashMap<PageId, usize>"
-    "-free_list": "Vec<usize>"
+    "-frames": "Vec<RwLock<SlottedPage>>"
+    "-descriptors": "Vec<FrameDescriptor>"
+    "-page_table": "Mutex<HashMap<PageId, usize>>"
     "-replacer": LRUReplacer
     "-disk_manager": DiskManager
-    "-log_manager": "Option<LogManager>"
-    +fetch_page(): "Option<&mut SlottedPage>"
-    +unpin_page(): bool
+    +fetch_page(): "Result<usize, BufferError>"
+    +unpin_page(): "Result<(), BufferError>"
   }
 
   LRUReplacer: {
     class: struct
-    "-frames": "HashMap<usize, Node>"
-    "-head": "Option<usize>"
-    "-tail": "Option<usize>"
-    +victim(): "Option<usize>"
-    +pin(): void
+    "-capacity": usize
+    "-lru_list": "Mutex<VecDeque<usize>>"
+    "-pinned": "Mutex<Vec<bool>>"
+    +evict(): "Option<usize>"
   }
   
   LogManager: {

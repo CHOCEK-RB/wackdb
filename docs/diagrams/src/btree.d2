@@ -10,18 +10,16 @@ btree: "B+ Tree Physical Architecture (wackdb_btree)" {
 
   header: "BTreePageHeader (16 bytes)" {
     shape: sql_table
-    lsn: u64
-    page_id: u32
-    parent_page_id: u32
-    page_type: u16
+    node_type: u8
     num_keys: u16
+    max_keys: u16
+    parent_page_id: PageId
+    next_page_id: PageId
   }
 
   leaf_node: "LeafNode Layout (Page 8192 bytes)" {
     shape: class
     +header: BTreePageHeader
-    +next_page_id: u32
-    +prev_page_id: u32
     +keys: "KeyType[max_keys]"
     +values: "ValueType[max_keys]"
   }

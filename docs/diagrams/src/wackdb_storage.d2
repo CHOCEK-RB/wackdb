@@ -1,4 +1,4 @@
-direction: right
+direction: down
 vars: {
   d2-config: {
     theme-id: 301
@@ -24,7 +24,7 @@ wackdb_storage: {
   BasicDiskManager: {
     class: struct
     "-data_dir": PathBuf
-    "-files": "Mutex<HashMap<u32, FileHandle>>"
+    "-file_handles": "Mutex<HashMap<u32, FileHandle>>"
     +new(data_dir: PathBuf): BasicDiskManager
   }
 

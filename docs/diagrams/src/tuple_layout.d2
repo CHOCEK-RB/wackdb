@@ -1,0 +1,14 @@
+direction: right
+vars: { d2-config: { theme-id: 301 } }
+
+title: |md
+  ## Estructura Binaria de la Tupla (Data Region)
+| {shape: text}
+
+TupleLayout: {
+  shape: class
+  +TupleHeader: "Metadatos (xmin, xmax)"
+  +NullBitmap: "Mapa de bits (Opcional)"
+  +FixedData: "Enteros (i32), Booleanos"
+  +VarData: "Cadenas Varchar y Blobs"
+}
