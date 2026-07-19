@@ -65,8 +65,32 @@ pub struct JoinClause {
     pub right_col: String,
 }
 
-pub fn parse_sql(sql: &str) -> Result<Ast, String> {
-    let sql = sql.trim().trim_end_matches(';');
+fn normalize_sql(sql: &str) -> String {
+    let mut normalized = String::with_capacity(sql.len());
+    let mut in_quotes = false;
+    let mut last_was_space = false;
+    for c in sql.chars() {
+        if c == '\'' {
+            in_quotes = !in_quotes;
+            normalized.push(c);
+            last_was_space = false;
+        } else if !in_quotes && c.is_ascii_whitespace() {
+            if !last_was_space {
+                normalized.push(' ');
+                last_was_space = true;
+            }
+        } else {
+            normalized.push(c);
+            last_was_space = false;
+        }
+    }
+    normalized.trim().to_string()
+}
+
+pub fn parse_sql(raw_sql: &str) -> Result<Ast, String> {
+    let raw_sql = raw_sql.trim().trim_end_matches(';');
+    let sql_owned = normalize_sql(raw_sql);
+    let sql = sql_owned.as_str();
     let upper = sql.to_uppercase();
 
     if upper.starts_with("SELECT ") {
@@ -75,7 +99,10 @@ pub fn parse_sql(sql: &str) -> Result<Ast, String> {
         let columns_str = &sql[7..from_idx].trim();
         let columns: Vec<String> = columns_str
             .split(',')
-            .map(|s| s.trim().to_string())
+            .map(|s| {
+                let s = s.trim();
+                s.split('.').last().unwrap_or(s).to_string()
+            })
             .collect();
 
         let rest = &sql[from_idx + 6..].trim();
@@ -136,16 +163,11 @@ pub fn parse_sql(sql: &str) -> Result<Ast, String> {
 
                 let on_part = &rest[on_idx + 4..on_cond_end].trim();
                 let mut on_tokens = on_part.split('=');
-                let left_col = on_tokens
-                    .next()
-                    .ok_or("Missing left ON condition")?
-                    .trim()
-                    .to_string();
-                let right_col = on_tokens
-                    .next()
-                    .ok_or("Missing right ON condition")?
-                    .trim()
-                    .to_string();
+                let left_raw = on_tokens.next().ok_or("Missing left ON condition")?.trim();
+                let right_raw = on_tokens.next().ok_or("Missing right ON condition")?.trim();
+
+                let left_col = left_raw.split('.').last().unwrap_or(left_raw).to_string();
+                let right_col = right_raw.split('.').last().unwrap_or(right_raw).to_string();
 
                 joins.push(JoinClause {
                     table: j_table,
@@ -220,7 +242,8 @@ pub fn parse_sql(sql: &str) -> Result<Ast, String> {
                         };
 
                         if let Some((i, len, op)) = op_idx {
-                            let left_col = raw_c[..i].trim().to_string();
+                            let left_raw = raw_c[..i].trim();
+                            let left_col = left_raw.split('.').last().unwrap_or(left_raw).to_string();
                             let right_col = raw_c[i + len..].trim().to_string();
                             where_clause.push(WhereCondition {
                                 left_col,

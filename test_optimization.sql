@@ -27,5 +27,12 @@ INSERT INTO users
 INSERT INTO users
     VALUES (104, 'david', 1);
 
-SELECT id, username, role_name FROM users JOIN roles ON role_id = id WHERE id > 101;
-
+SELECT
+    users.id,
+    users.username,
+    roles.role_name
+FROM
+    users
+    JOIN roles ON users.role_id = roles.id
+WHERE
+    users.id > 101;
