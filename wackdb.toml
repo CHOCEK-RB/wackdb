@@ -1,0 +1,25 @@
+# WackDB Configuration File
+# This file is loaded automatically when the database starts.
+
+# The size of the buffer pool (number of pages kept in RAM)
+# Default is 64. Increase for better performance on large datasets.
+buffer_pool_size = 64
+
+[checkpoint]
+# How often the checkpointer thread forces a WAL flush to disk (in seconds).
+# Default is 30.
+interval_secs = 30
+
+# Maximum size of the Write-Ahead Log before triggering a checkpoint (in KB).
+# Default is 1024.
+max_wal_size_kb = 1024
+
+[query]
+# Number of tuples to sort in RAM before spilling to disk during External Merge Sort.
+# Default is 1000.
+sort_chunk_size = 1000
+
+[web]
+# Port for the wackdb visualizer web server
+# Default is 3000
+port = 3000
