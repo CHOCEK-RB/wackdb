@@ -36,11 +36,20 @@ pub fn execute_query<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
     let mut base_where = Vec::new();
     let mut remaining_where = Vec::new();
 
-    for cond in where_clause {
-        if base_schema.columns.iter().any(|c| c.name == cond.left_col) {
-            base_where.push(cond);
-        } else {
-            remaining_where.push(cond);
+    let has_or = where_clause.iter().any(|c| matches!(c.next_logic, Some(wackdb_sql::LogicOp::Or)));
+    let all_base = where_clause.iter().all(|c| base_schema.columns.iter().any(|col| col.name == c.left_col));
+
+    if has_or && !all_base {
+        // Prevent pushdown if OR connects conditions across different tables
+        remaining_where = where_clause;
+    } else {
+        // Safe to push down (Conjunctive Normal Form or purely base table)
+        for cond in where_clause {
+            if base_schema.columns.iter().any(|c| c.name == cond.left_col) {
+                base_where.push(cond);
+            } else {
+                remaining_where.push(cond);
+            }
         }
     }
 
