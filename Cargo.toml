@@ -3,8 +3,8 @@ resolver = "3"
 members = ["crates/wackdb_btree",
   "crates/wackdb_buffer", "crates/wackdb_catalog",
   "crates/wackdb_cli",
-  "crates/wackdb_page",
-  "crates/wackdb_storage", "crates/wackdb_tuple", "crates/wackdb_web",
+  "crates/wackdb_page", "crates/wackdb_query", "crates/wackdb_sql",
+  "crates/wackdb_storage", "crates/wackdb_tuple", "crates/wackdb_wal", "crates/wackdb_web",
 ]
 
 [workspace.dependencies]
@@ -18,6 +18,7 @@ crossterm = "0.29"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tempfile = "3"
+toml = "0.8"
 
 [workspace.lints.rust]
 future-incompatible = "warn"
