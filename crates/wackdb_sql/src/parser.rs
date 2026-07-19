@@ -68,8 +68,32 @@ pub struct JoinClause {
 fn normalize_sql(sql: &str) -> String {
     let mut normalized = String::with_capacity(sql.len());
     let mut in_quotes = false;
+    let mut in_comment = false;
     let mut last_was_space = false;
-    for c in sql.chars() {
+    let chars: Vec<char> = sql.chars().collect();
+    let mut i = 0;
+    
+    while i < chars.len() {
+        let c = chars[i];
+        
+        if in_comment {
+            if c == '\n' {
+                in_comment = false;
+                if !last_was_space {
+                    normalized.push(' ');
+                    last_was_space = true;
+                }
+            }
+            i += 1;
+            continue;
+        }
+
+        if !in_quotes && c == '-' && i + 1 < chars.len() && chars[i+1] == '-' {
+            in_comment = true;
+            i += 2;
+            continue;
+        }
+        
         if c == '\'' {
             in_quotes = !in_quotes;
             normalized.push(c);
@@ -83,6 +107,7 @@ fn normalize_sql(sql: &str) -> String {
             normalized.push(c);
             last_was_space = false;
         }
+        i += 1;
     }
     normalized.trim().to_string()
 }
