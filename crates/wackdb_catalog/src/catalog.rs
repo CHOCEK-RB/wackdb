@@ -151,10 +151,10 @@ impl Catalog {
         delta: i32,
     ) -> Result<(), CatalogError> {
         if let Some(meta) = self.data.tables.get_mut(name) {
-            if delta < 0 {
+            if delta > 0 {
+                meta.num_records = meta.num_records.saturating_add(delta.unsigned_abs() as usize);
+            } else if delta < 0 {
                 meta.num_records = meta.num_records.saturating_sub(delta.unsigned_abs() as usize);
-            } else {
-                meta.num_records = meta.num_records.saturating_add(delta as usize);
             }
             self.flush()?;
             Ok(())

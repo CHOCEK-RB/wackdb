@@ -61,7 +61,7 @@ pub fn process_command<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
                 };
 
                 let telemetry = format!(
-                    "\n[STATISTICS]\n- Buffer Cache Hits: {}\n- Cache Misses (Disk I/O): {} (Hit Rate: {:.2}%)\n- Execution Pipeline: {}\n",
+                    "\n- Buffer Cache Hits: {}\n- Cache Misses (Disk I/O): {} (Hit Rate: {:.2}%)\n- Execution Pipeline: {}\n",
                     delta_hits, delta_misses, hr, plan
                 );
 
@@ -92,7 +92,7 @@ pub fn process_command<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
                     "\n[STATISTICS]\n- Buffer Cache Hits: {}\n- Cache Misses (Disk I/O): {} (Hit Rate: {:.2}%)\n- Execution Pipeline: {}\n",
                     delta_hits, delta_misses, hr, plan
                 );
-                
+
                 if verbose {
                     Ok(Some(telemetry))
                 } else {

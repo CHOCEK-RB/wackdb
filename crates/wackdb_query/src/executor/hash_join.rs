@@ -85,12 +85,10 @@ impl<L: Executor, R: Executor> Executor for HashJoin<L, R> {
                 .ok_or_else(|| QueryError::Execution(format!("Left column {} not found", self.left_col_name)))?;
             
             let vals = lt.to_values(left_schema)?;
-            if let Some(val) = vals.get(left_idx) {
-                if let Some(hash_table) = &self.right_hash_table {
-                    if let Some(matches) = hash_table.get(val) {
-                        self.current_matches = matches.clone();
-                    }
-                }
+            if let Some(val) = vals.get(left_idx)
+                && let Some(matches) = self.right_hash_table.as_ref().and_then(|ht| ht.get(val))
+            {
+                self.current_matches = matches.clone();
             }
             
             self.current_left_tuple = Some(lt);
