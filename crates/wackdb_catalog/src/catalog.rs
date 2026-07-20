@@ -145,16 +145,16 @@ impl Catalog {
     /// Updates the number of records (cardinality) for a given table.
     /// # Errors
     /// Returns `CatalogError::TableNotFound` if the table does not exist.
-    pub fn update_num_records(
-        &mut self,
-        name: &str,
-        delta: i32,
-    ) -> Result<(), CatalogError> {
+    pub fn update_num_records(&mut self, name: &str, delta: i32) -> Result<(), CatalogError> {
         if let Some(meta) = self.data.tables.get_mut(name) {
             if delta > 0 {
-                meta.num_records = meta.num_records.saturating_add(delta.unsigned_abs() as usize);
+                meta.num_records = meta
+                    .num_records
+                    .saturating_add(delta.unsigned_abs() as usize);
             } else if delta < 0 {
-                meta.num_records = meta.num_records.saturating_sub(delta.unsigned_abs() as usize);
+                meta.num_records = meta
+                    .num_records
+                    .saturating_sub(delta.unsigned_abs() as usize);
             }
             self.flush()?;
             Ok(())

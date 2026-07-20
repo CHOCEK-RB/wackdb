@@ -72,10 +72,12 @@ fn normalize_sql(sql: &str) -> String {
     let mut last_was_space = false;
     let chars: Vec<char> = sql.chars().collect();
     let mut i = 0;
-    
+
     while i < chars.len() {
-        let Some(&c) = chars.get(i) else { break; };
-        
+        let Some(&c) = chars.get(i) else {
+            break;
+        };
+
         if in_comment {
             if c == '\n' {
                 in_comment = false;
@@ -93,7 +95,7 @@ fn normalize_sql(sql: &str) -> String {
             i += 2;
             continue;
         }
-        
+
         if c == '\'' {
             in_quotes = !in_quotes;
             normalized.push(c);
@@ -191,8 +193,16 @@ pub fn parse_sql(raw_sql: &str) -> Result<Ast, String> {
                 let left_raw = on_tokens.next().ok_or("Missing left ON condition")?.trim();
                 let right_raw = on_tokens.next().ok_or("Missing right ON condition")?.trim();
 
-                let left_col = left_raw.split('.').next_back().unwrap_or(left_raw).to_string();
-                let right_col = right_raw.split('.').next_back().unwrap_or(right_raw).to_string();
+                let left_col = left_raw
+                    .split('.')
+                    .next_back()
+                    .unwrap_or(left_raw)
+                    .to_string();
+                let right_col = right_raw
+                    .split('.')
+                    .next_back()
+                    .unwrap_or(right_raw)
+                    .to_string();
 
                 joins.push(JoinClause {
                     table: j_table,
@@ -268,7 +278,11 @@ pub fn parse_sql(raw_sql: &str) -> Result<Ast, String> {
 
                         if let Some((i, len, op)) = op_idx {
                             let left_raw = raw_c[..i].trim();
-                            let left_col = left_raw.split('.').next_back().unwrap_or(left_raw).to_string();
+                            let left_col = left_raw
+                                .split('.')
+                                .next_back()
+                                .unwrap_or(left_raw)
+                                .to_string();
                             let right_col = raw_c[i + len..].trim().to_string();
                             where_clause.push(WhereCondition {
                                 left_col,

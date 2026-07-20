@@ -113,7 +113,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         WackDbConfig::default()
     };
 
-
     println!("Connected to Data Directory at: {}", data_dir);
     println!("Loaded Config: {:?}", config);
     println!("Enter '.help' for usage hints. Statements must end with ';'.");

@@ -5,7 +5,7 @@ use wackdb_btree::tree::BTreeIndex;
 use wackdb_buffer::buffer_pool::BufferPoolManager;
 use wackdb_catalog::Catalog;
 use wackdb_query::executor::predicate::evaluate_where_clause;
-use wackdb_query::{Executor, ExternalMergeSort, NestedLoopJoin, HashJoin, Project, Select};
+use wackdb_query::{Executor, ExternalMergeSort, HashJoin, NestedLoopJoin, Project, Select};
 use wackdb_sql::{Ast, JoinClause, WhereCondition};
 use wackdb_storage::DiskManager;
 use wackdb_tuple::{Schema, value::Value};
@@ -36,8 +36,12 @@ pub fn execute_query<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
     let mut base_where = Vec::new();
     let mut remaining_where = Vec::new();
 
-    let has_or = where_clause.iter().any(|c| matches!(c.next_logic, Some(wackdb_sql::LogicOp::Or)));
-    let all_base = where_clause.iter().all(|c| base_schema.columns.iter().any(|col| col.name == c.left_col));
+    let has_or = where_clause
+        .iter()
+        .any(|c| matches!(c.next_logic, Some(wackdb_sql::LogicOp::Or)));
+    let all_base = where_clause
+        .iter()
+        .all(|c| base_schema.columns.iter().any(|col| col.name == c.left_col));
 
     if has_or && !all_base {
         // Prevent pushdown if OR connects conditions across different tables
@@ -217,10 +221,12 @@ fn build_join_pipeline<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
                         return false;
                     };
 
-                    let Some(l_idx) = ls.columns.iter().position(|c| c.name == left_col_name) else {
+                    let Some(l_idx) = ls.columns.iter().position(|c| c.name == left_col_name)
+                    else {
                         return false;
                     };
-                    let Some(r_idx) = rs.columns.iter().position(|c| c.name == right_col_name) else {
+                    let Some(r_idx) = rs.columns.iter().position(|c| c.name == right_col_name)
+                    else {
                         return false;
                     };
 

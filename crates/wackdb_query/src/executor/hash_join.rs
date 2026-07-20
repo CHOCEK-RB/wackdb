@@ -38,9 +38,14 @@ impl<L: Executor, R: Executor> HashJoin<L, R> {
     fn build_hash_table(&mut self) -> Result<(), QueryError> {
         let mut hash_table: HashMap<Value, Vec<Tuple>> = HashMap::new();
         let right_schema = self.right.schema().clone();
-        
-        let right_idx = right_schema.columns.iter().position(|c| c.name == self.right_col_name)
-            .ok_or_else(|| QueryError::Execution(format!("Right column {} not found", self.right_col_name)))?;
+
+        let right_idx = right_schema
+            .columns
+            .iter()
+            .position(|c| c.name == self.right_col_name)
+            .ok_or_else(|| {
+                QueryError::Execution(format!("Right column {} not found", self.right_col_name))
+            })?;
 
         while let Some(t) = self.right.next()? {
             let vals = t.to_values(&right_schema)?;
@@ -81,16 +86,21 @@ impl<L: Executor, R: Executor> Executor for HashJoin<L, R> {
             };
 
             let left_schema = self.left.schema();
-            let left_idx = left_schema.columns.iter().position(|c| c.name == self.left_col_name)
-                .ok_or_else(|| QueryError::Execution(format!("Left column {} not found", self.left_col_name)))?;
-            
+            let left_idx = left_schema
+                .columns
+                .iter()
+                .position(|c| c.name == self.left_col_name)
+                .ok_or_else(|| {
+                    QueryError::Execution(format!("Left column {} not found", self.left_col_name))
+                })?;
+
             let vals = lt.to_values(left_schema)?;
             if let Some(val) = vals.get(left_idx)
                 && let Some(matches) = self.right_hash_table.as_ref().and_then(|ht| ht.get(val))
             {
                 self.current_matches = matches.clone();
             }
-            
+
             self.current_left_tuple = Some(lt);
         }
     }

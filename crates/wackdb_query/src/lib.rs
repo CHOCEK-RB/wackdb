@@ -20,7 +20,7 @@ use wackdb_page::slot::PageSlot;
 use wackdb_tuple::{Schema, Tuple, value::Value};
 
 pub use executor::{
-    ExternalMergeSort, IndexScan, NestedLoopJoin, HashJoin, Optimizer, Project, Select, SeqScan,
+    ExternalMergeSort, HashJoin, IndexScan, NestedLoopJoin, Optimizer, Project, Select, SeqScan,
 };
 
 /// Retrieves a tuple record slice from raw page bytes given a slot index.
