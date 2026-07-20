@@ -34,9 +34,11 @@ wackdb_catalog: {
   TableMetadata: {
     class: struct
     +name: String
+    +schema: Schema
     +heap_relation_id: u32
     +index_relation_id: u32
     +root_page_num: "Option<u32>"
+    +num_records: usize
   }
 
   CatalogError: { shape: class }

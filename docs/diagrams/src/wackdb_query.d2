@@ -32,6 +32,7 @@ wackdb_query: {
   Select: { class: struct }
   Project: { class: struct }
   NestedLoopJoin: { class: struct }
+  HashJoin: { class: struct }
   ExternalMergeSort: { class: struct }
   
   PredicateEvaluator: {
@@ -44,6 +45,7 @@ wackdb_query: {
   Select -> ExecutorTrait: "impl"
   Project -> ExecutorTrait: "impl"
   NestedLoopJoin -> ExecutorTrait: "impl"
+  HashJoin -> ExecutorTrait: "impl"
   ExternalMergeSort -> ExecutorTrait: "impl"
 
   Optimizer -> SeqScan: "Builds physical plan"

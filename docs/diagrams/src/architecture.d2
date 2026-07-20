@@ -20,6 +20,7 @@ engine: "WackDB Engine" {
     idx: "IndexScan"
     sort: "ExternalMergeSort"
     join: "NestedLoopJoin"
+    hash: "HashJoin"
   }
   
   bpm: "Buffer Pool Manager (wackdb_buffer)" { shape: rectangle }

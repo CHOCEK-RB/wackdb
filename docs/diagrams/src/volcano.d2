@@ -48,6 +48,13 @@ QueryEngine: {
     +next(): "Option<Tuple>"
   }
 
+  HashJoin: "HashJoin\n(JOIN)" {
+    shape: class
+    +left: Box<dyn Executor>
+    +right_hash_table: "Option<HashMap>"
+    +next(): "Option<Tuple>"
+  }
+
   ExternalMergeSort: "ExternalMergeSort\n(ORDER BY)" {
     shape: class
     +child: Box<dyn Executor>
@@ -60,6 +67,7 @@ QueryEngine.IndexScan -> QueryEngine.ExecutorTrait: "impl"
 QueryEngine.Select -> QueryEngine.ExecutorTrait: "impl"
 QueryEngine.Project -> QueryEngine.ExecutorTrait: "impl"
 QueryEngine.NestedLoopJoin -> QueryEngine.ExecutorTrait: "impl"
+QueryEngine.HashJoin -> QueryEngine.ExecutorTrait: "impl"
 QueryEngine.ExternalMergeSort -> QueryEngine.ExecutorTrait: "impl"
 
 ExamplePipeline: "Pipeline Flow Example: SELECT name FROM users WHERE id > 10" {
