@@ -1,0 +1,44 @@
+direction: right
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+classes: {
+  struct: {
+    shape: class
+    style: { border-radius: 4 }
+  }
+  external: {
+    style: { stroke-dash: 5; opacity: 0.7 }
+  }
+}
+wackdb_web: {
+  AppState: {
+    class: struct
+    +buffer_pool: Arc<Mutex<BufferPoolManager>>
+    +catalog: Arc<Mutex<Catalog>>
+    +disk_manager: Arc<BasicDiskManager>
+  }
+  Handlers: {
+    shape: package
+    +get_buffer_pool_state()
+    +get_catalog_state()
+    +get_page_data()
+  }
+  DTOs: {
+    shape: package
+    PageIdDto: { class: struct }
+    FrameDto: { class: struct }
+    BufferPoolStateDto: { class: struct }
+    RecordDto: { class: struct }
+    BTreePageDto: { class: struct }
+    TableMetadataDto: { class: struct }
+  }
+  AppState -> Handlers: "Shared State"
+  Handlers -> DTOs: "Returns JSON"
+}
+wackdb_buffer: { class: external }
+wackdb_catalog: { class: external }
+wackdb_web.AppState -> wackdb_buffer: "Inspects pool"
+wackdb_web.AppState -> wackdb_catalog: "Inspects catalog"

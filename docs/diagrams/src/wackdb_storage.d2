@@ -1,0 +1,53 @@
+direction: right
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+classes: {
+  struct: {
+    shape: class
+    style: { border-radius: 4 }
+  }
+  external: {
+    style: { stroke-dash: 5; opacity: 0.7 }
+  }
+}
+
+wackdb_storage: {
+  DiskManager: {
+    shape: class
+    "+read_page(page_id: PageId, data: &mut [u8]): Result<(), StorageError>"
+    "+write_page(page_id: PageId, data: &[u8]): Result<(), StorageError>"
+  }
+
+  BasicDiskManager: {
+    class: struct
+    "-data_dir": PathBuf
+    "-files": "Mutex<HashMap<u32, FileHandle>>"
+    +new(data_dir: PathBuf): BasicDiskManager
+  }
+
+  PageId: {
+    class: struct
+    +file_id: u32
+    +page_num: u32
+  }
+  
+  CTID: {
+    class: struct
+    +page_id: PageId
+    +slot_id: u32
+  }
+
+  BasicDiskManager -> DiskManager: "impl"
+  DiskManager -> PageId: "Reads/Writes based on PageId"
+}
+
+wackdb_buffer: { class: external }
+wackdb_tuple: { class: external }
+PhysicalDisk: { class: external }
+
+wackdb_buffer -> wackdb_storage.DiskManager: "Delegates I/O"
+wackdb_tuple -> wackdb_storage.CTID: "Embeds in values"
+wackdb_storage.BasicDiskManager -> PhysicalDisk: "Writes to Heap/Idx Files"

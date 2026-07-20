@@ -1,7 +1,8 @@
 use crate::value::DataType;
+use serde::{Deserialize, Serialize};
 
 /// Represents a single column definition within a schema.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Column {
     /// The logical name of the column.
     pub name: String,
@@ -24,7 +25,7 @@ impl Column {
 }
 
 /// Represents the structural schema of a tuple (a collection of columns).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Schema {
     /// The ordered list of columns defining this schema.
     pub columns: Vec<Column>,

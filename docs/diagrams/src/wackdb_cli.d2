@@ -1,0 +1,37 @@
+direction: right
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+classes: {
+  struct: {
+    shape: class
+    style: { border-radius: 4 }
+  }
+  external: {
+    style: { stroke-dash: 5; opacity: 0.7 }
+  }
+}
+wackdb_cli: {
+  WackDbConfig: {
+    class: struct
+    +buffer_pool_size: usize
+    +db_path: PathBuf
+  }
+  CheckpointConfig: {
+    class: struct
+    +interval_ms: u64
+  }
+  Main: {
+    shape: class
+    +run_repl(): void
+  }
+  WackDbConfig -> Main: "Used by"
+  CheckpointConfig -> Main: "Used by"
+}
+wackdb_sql: { class: external }
+wackdb_query: { class: external }
+
+wackdb_cli.Main -> wackdb_sql: "Parses"
+wackdb_cli.Main -> wackdb_query: "Executes"

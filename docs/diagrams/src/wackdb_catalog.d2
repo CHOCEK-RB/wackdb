@@ -1,0 +1,54 @@
+direction: right
+
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+classes: {
+  struct: {
+    shape: class
+    style: { border-radius: 4 }
+  }
+  external: {
+    style: { stroke-dash: 5; opacity: 0.7 }
+  }
+}
+
+wackdb_catalog: {
+  Catalog: {
+    class: struct
+    "-catalog_path": PathBuf
+    "-data": CatalogData
+    +create_table(name: String): void
+    +get_table(name: String): "Option<TableMetadata>"
+  }
+
+  CatalogData: {
+    class: struct
+    +next_relation_id: u32
+    "+tables": "HashMap<String, TableMetadata>"
+  }
+
+  TableMetadata: {
+    class: struct
+    +name: String
+    +heap_relation_id: u32
+    +index_relation_id: u32
+    +root_page_num: "Option<u32>"
+  }
+
+  CatalogError: { shape: class }
+
+  Catalog -> CatalogData: "Manages"
+  CatalogData -> TableMetadata: "Contains"
+}
+
+wackdb_query: { class: external }
+wackdb_cli: { class: external }
+PhysicalDisk: { class: external }
+
+wackdb_query -> wackdb_catalog.Catalog: "Reads Metadata"
+wackdb_cli -> wackdb_catalog.Catalog: "Creates Tables"
+wackdb_catalog.Catalog -> PhysicalDisk: "Serializes catalog.json"

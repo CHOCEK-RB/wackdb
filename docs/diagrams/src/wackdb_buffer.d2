@@ -1,0 +1,58 @@
+direction: right
+
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+classes: {
+  struct: {
+    shape: class
+    style: { border-radius: 4 }
+  }
+  external: {
+    style: { stroke-dash: 5; opacity: 0.7 }
+  }
+}
+
+wackdb_buffer: {
+  BufferPoolManager: {
+    class: struct
+    "-pool": "Vec<SlottedPage>"
+    "-page_table": "HashMap<PageId, usize>"
+    "-free_list": "Vec<usize>"
+    "-replacer": LRUReplacer
+    "-disk_manager": DiskManager
+    "-log_manager": "Option<LogManager>"
+    +fetch_page(): "Option<&mut SlottedPage>"
+    +unpin_page(): bool
+  }
+
+  LRUReplacer: {
+    class: struct
+    "-frames": "HashMap<usize, Node>"
+    "-head": "Option<usize>"
+    "-tail": "Option<usize>"
+    +victim(): "Option<usize>"
+    +pin(): void
+  }
+  
+  LogManager: {
+    class: struct
+    "-log_buffer": "Vec<u8>"
+    "-flushed_lsn": u64
+    +append(): u64
+  }
+  
+  BufferPoolManager -> LRUReplacer: "Evicts victim frames"
+  BufferPoolManager -> LogManager: "Enforces WAL before data write"
+}
+
+wackdb_storage: { class: external }
+wackdb_wal: { class: external }
+wackdb_page: { class: external }
+
+wackdb_buffer.BufferPoolManager -> wackdb_storage: "Reads/Writes Pages"
+wackdb_buffer.BufferPoolManager -> wackdb_page: "Manages SlottedPages"
+wackdb_buffer.LogManager -> wackdb_wal: "Appends log records"

@@ -1,0 +1,40 @@
+direction: right
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+classes: {
+  struct: {
+    shape: class
+    style: { border-radius: 4 }
+  }
+  external: {
+    style: { stroke-dash: 5; opacity: 0.7 }
+  }
+}
+
+wackdb_wal: {
+  DiskLogManager: {
+    class: struct
+    "-file": "Mutex<File>"
+    "-flushed_lsn": AtomicU64
+    "-next_lsn": AtomicU64
+    "-log_buffer": "Mutex<Vec<(u64, Vec<u8>)>>"
+    +read_all_logs(): "std::io::Result<Vec<Vec<u8>>>"
+  }
+  LogManager: {
+    shape: class
+    "+flush_up_to(lsn: u64): Result<(), BufferError>"
+    "+append_record(payload: &[u8]): Result<u64, BufferError>"
+    "+checkpoint(): Result<(), BufferError>"
+    +log_size(): u64
+  }
+  DiskLogManager -> LogManager: "impl"
+}
+
+wackdb_buffer: { class: external }
+PhysicalDisk: { class: external }
+
+wackdb_buffer -> wackdb_wal.LogManager: "Calls"
+wackdb_wal.DiskLogManager -> PhysicalDisk: "Appends to wackdb.wal"

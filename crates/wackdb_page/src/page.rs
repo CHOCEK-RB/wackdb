@@ -61,6 +61,25 @@ impl<const PAGE_SIZE: usize> SlottedPage<PAGE_SIZE> {
         }
     }
 
+    /// Retrieves the Log Sequence Number (LSN) from the page header.
+    /// The LSN tracks the most recent log record that describes a modification to this page.
+    #[must_use]
+    pub fn get_lsn(&self) -> u64 {
+        self.header().log_sequence_number
+    }
+
+    /// Updates the Log Sequence Number (LSN) safely in the page header.
+    /// This must be called whenever the page is modified.
+    pub fn set_lsn(&mut self, lsn: u64) {
+        let mut header_copy = *self.header();
+        header_copy.log_sequence_number = lsn;
+        unsafe {
+            let src = (&raw const header_copy).cast::<u8>();
+            let dst = self.data.as_mut_ptr();
+            std::ptr::copy_nonoverlapping(src, dst, size_of::<SlottedPageHeader>());
+        }
+    }
+
     /// Returns an immutable reference to the page header.
     #[must_use]
     pub fn header(&self) -> &SlottedPageHeader {
@@ -204,49 +223,9 @@ impl<const PAGE_SIZE: usize> SlottedPage<PAGE_SIZE> {
         };
         true
     }
-
-    /// Prints a formatted ASCII table representing the internal structure of this `SlottedPage`.
-    ///
-    /// This includes the page header fields (LSN, next page ID, total slots, free space boundaries)
-    /// and a slot directory table detailing the offset and length of each tuple currently stored.
-    pub fn print_page_architecture(&self) {
-        let header = self.header();
-        println!("\n[ Page Header ]");
-        println!("+-------------------------+-----------------+");
-        println!("| Field                   | Value           |");
-        println!("+-------------------------+-----------------+");
-        println!(
-            "| LSN (Log Sequence Num)  | {:<15} |",
-            header.log_sequence_number
-        );
-        println!("| Total Slots             | {:<15} |", header.total_slots);
-        println!(
-            "| Free Space Lower        | {:<15} |",
-            header.free_space_lower
-        );
-        println!(
-            "| Free Space Upper        | {:<15} |",
-            header.free_space_upper
-        );
-        println!("| Page Flags              | {:<15} |", header.page_flags);
-        println!("+-------------------------+-----------------+");
-
-        let slots = self.slots();
-        println!("\n[ Slot Directory ]");
-        println!("+---------+---------+---------+");
-        println!("| Slot ID | Offset  | Length  |");
-        println!("+---------+---------+---------+");
-        for (i, slot) in slots.iter().enumerate().take(header.total_slots as usize) {
-            println!(
-                "| {:02}      | {:<7} | {:<7} |",
-                i, slot.offset, slot.length
-            );
-        }
-        println!("+---------+---------+---------+");
-    }
 }
 
-#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,5 +258,40 @@ mod tests {
         page.insert_record(b"B", 100).unwrap();
 
         assert_eq!(page.header().total_slots, 2);
+    }
+
+    #[test]
+    fn test_slot_directory_insert_and_read() {
+        let mut page = SlottedPage::<TEST_PAGE_SIZE>::new();
+        let payload1 = b"variable_length_record_1";
+        let payload2 = b"more_data_here";
+
+        let slot1 = page
+            .insert_record(payload1, 100)
+            .expect("failed to insert variable-length record 1");
+        let slot2 = page
+            .insert_record(payload2, 101)
+            .expect("failed to insert variable-length record 2");
+
+        assert_eq!(slot1, 0);
+        assert_eq!(slot2, 1);
+
+        let (_, rec1) = page.get_record(slot1).expect("failed to read record 1");
+        assert_eq!(rec1, payload1);
+        let (_, rec2) = page.get_record(slot2).expect("failed to read record 2");
+        assert_eq!(rec2, payload2);
+
+        let header = page.header();
+        assert_eq!(header.total_slots, 2);
+        assert!(header.free_space_upper < TEST_PAGE_SIZE as u16);
+    }
+
+    #[test]
+    fn test_page_lsn_storage() {
+        let mut page = SlottedPage::<TEST_PAGE_SIZE>::new();
+        page.set_lsn(42);
+
+        let lsn = page.get_lsn();
+        assert_eq!(lsn, 42, "the LSN must be preserved in the page structure");
     }
 }

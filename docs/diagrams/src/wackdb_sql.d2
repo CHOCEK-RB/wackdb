@@ -1,0 +1,50 @@
+direction: right
+
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+classes: {
+  struct: {
+    shape: class
+    style: { border-radius: 4 }
+  }
+  external: {
+    style: { stroke-dash: 5; opacity: 0.7 }
+  }
+}
+
+wackdb_sql: {
+  Ast: {
+    class: struct
+    +Select: variant
+    +Insert: variant
+    +CreateTable: variant
+    +DropTable: variant
+    +Delete: variant
+  }
+
+  WhereCondition: { class: struct }
+  JoinClause: { class: struct }
+  Operator: { shape: class }
+  LogicOp: { shape: class }
+
+  Parser: {
+    shape: class
+    +parse_sql(sql: String): Ast
+  }
+
+  Ast -> WhereCondition: "contains"
+  Ast -> JoinClause: "contains"
+  WhereCondition -> Operator: "uses"
+  WhereCondition -> LogicOp: "uses"
+  Parser -> Ast: "produces"
+}
+
+wackdb_cli: { class: external }
+wackdb_query: { class: external }
+
+wackdb_cli -> wackdb_sql.Parser: "Sends raw string"
+wackdb_sql.Ast -> wackdb_query: "Fed to Optimizer"

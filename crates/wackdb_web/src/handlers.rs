@@ -274,13 +274,13 @@ pub async fn fetch_and_get_btree_page(
             let mut keys = Vec::with_capacity(num_keys);
             let mut values = Vec::with_capacity(num_keys);
             for i in 0..num_keys {
-                keys.push(leaf.keys.get(i).copied().unwrap_or_default());
+                keys.push(leaf.keys().get(i).copied().unwrap_or_default());
                 let val_page = leaf
-                    .values
+                    .values()
                     .get(i)
                     .map(|v| v.page_id.page_num)
                     .unwrap_or_default();
-                let val_slot = leaf.values.get(i).map(|v| v.slot_idx).unwrap_or_default();
+                let val_slot = leaf.values().get(i).map(|v| v.slot_idx).unwrap_or_default();
                 values.push(format!("p{val_page}:s{val_slot}"));
             }
             BTreeNodeDataDto::Leaf(BTreeLeafDataDto { keys, values })
@@ -289,14 +289,14 @@ pub async fn fetch_and_get_btree_page(
             let mut keys = Vec::with_capacity(num_keys);
             let mut children = Vec::with_capacity(num_keys + 1);
             for i in 0..num_keys {
-                keys.push(internal.keys.get(i).copied().unwrap_or_default());
+                keys.push(internal.keys().get(i).copied().unwrap_or_default());
             }
             for i in 0..=num_keys {
                 children.push(
                     internal
-                        .children
+                        .children()
                         .get(i)
-                        .map(|c| c.page_num)
+                        .map(|v| v.page_num)
                         .unwrap_or_default(),
                 );
             }

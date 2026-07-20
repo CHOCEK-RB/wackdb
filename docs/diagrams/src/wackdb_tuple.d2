@@ -1,0 +1,52 @@
+direction: right
+
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+classes: {
+  struct: {
+    shape: class
+    style: { border-radius: 4 }
+  }
+  external: {
+    style: { stroke-dash: 5; opacity: 0.7 }
+  }
+}
+
+wackdb_tuple: {
+  Tuple: {
+    class: struct
+    "+values": "Vec<Value>"
+  }
+
+  Value: {
+    class: struct
+    +Integer: i32
+    +Boolean: bool
+    +Varchar: String
+    +Null: variant
+  }
+  
+  Schema: {
+    class: struct
+    "+columns": "Vec<Column>"
+  }
+
+  Column: {
+    class: struct
+    +name: String
+    +data_type: DataType
+  }
+
+  Tuple -> Value: "Contains"
+  Schema -> Column: "Contains"
+}
+
+wackdb_query: { class: external }
+wackdb_buffer: { class: external }
+
+wackdb_query -> wackdb_tuple.Tuple: "Projects and filters"
+wackdb_buffer -> wackdb_tuple.Tuple: "Serializes to bytes"
