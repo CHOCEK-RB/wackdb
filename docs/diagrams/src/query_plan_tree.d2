@@ -1,0 +1,25 @@
+direction: up
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+title: |md
+  ## Árbol Lógico del Plan de Ejecución
+  `SELECT u.name, o.total FROM users u JOIN orders o ON ... WHERE u.age > 18`
+| {shape: text}
+
+Project: "Project\n(u.name, o.total)" { shape: step }
+NestedLoopJoin: "NestedLoopJoin\nON u.id = o.user_id" { shape: step }
+Filter: "Filter\n(u.age > 18)" { shape: step }
+IndexScan: "IndexScan\n(Tabla 'users')" { shape: step }
+SeqScan: "SeqScan\n(Tabla 'orders')" { shape: step }
+
+# Invis edge para titulo
+title -> Project { style.stroke: transparent }
+
+IndexScan -> Filter: "flujo perezoso"
+Filter -> NestedLoopJoin: "Relación Externa\n(Hijo Izquierdo)"
+SeqScan -> NestedLoopJoin: "Relación Interna\n(Hijo Derecho)"
+NestedLoopJoin -> Project: "Tuplas unidas"

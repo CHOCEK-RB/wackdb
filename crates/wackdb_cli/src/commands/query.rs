@@ -129,9 +129,16 @@ fn build_base_pipeline<'a, const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
         let mut bounds = None;
         if where_clause.len() == 1 {
             let cond = &where_clause[0];
-            if cond.left_col == "id" && cond.operator == wackdb_sql::Operator::Eq {
+            if cond.left_col == "id" {
                 if let Ok(v) = cond.right_val.parse::<i32>() {
-                    bounds = Some((index, v, v));
+                    match cond.operator {
+                        wackdb_sql::Operator::Eq => bounds = Some((index, v, v)),
+                        wackdb_sql::Operator::Gt => bounds = Some((index, v.saturating_add(1), i32::MAX)),
+                        wackdb_sql::Operator::Gte => bounds = Some((index, v, i32::MAX)),
+                        wackdb_sql::Operator::Lt => bounds = Some((index, i32::MIN, v.saturating_sub(1))),
+                        wackdb_sql::Operator::Lte => bounds = Some((index, i32::MIN, v)),
+                        wackdb_sql::Operator::Neq => {}
+                    }
                 }
             }
         }

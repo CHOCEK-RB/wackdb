@@ -6,10 +6,16 @@ title: |md
 | {shape: text}
 
 step1: "1. Consulta solicita Página X" { shape: step }
-step2: "2. Caché lleno (LRU elige Víctima Y)" { shape: step }
-step3: "3. ¿La Página Y está sucia (Dirty)?" { shape: diamond }
-step4: "4. Volcar (Flush) Página Y al Disco" { shape: step }
-step5: "5. Leer Página X desde Disco al Frame" { shape: step }
+step2: "2. Caché lleno \n(LRU elige Víctima Y)" { shape: step }
+step3: "3. ¿La Página Y \nestá sucia (Dirty)?" { shape: diamond }
+step4: "4. Volcar (Flush) \nPágina Y al Disco" { shape: step }
+step5: "5. Leer Página X \ndesde Disco al Frame" { shape: step }
+
+title -> step1: {
+  style: {
+    stroke: transparent
+  }
+}
 
 step1 -> step2
 step2 -> step3

@@ -11,7 +11,6 @@ title: |md
 | {shape: text}
 
 QueryEngine: {
-  shape: package
   
   ExecutorTrait: "trait Executor" {
     shape: class
@@ -70,15 +69,3 @@ QueryEngine.NestedLoopJoin -> QueryEngine.ExecutorTrait: "impl"
 QueryEngine.HashJoin -> QueryEngine.ExecutorTrait: "impl"
 QueryEngine.ExternalMergeSort -> QueryEngine.ExecutorTrait: "impl"
 
-ExamplePipeline: "Pipeline Flow Example: SELECT name FROM users WHERE id > 10" {
-  style.fill: transparent
-  
-  project: "Project\n(name)" { shape: step }
-  select: "Select\n(id > 10)" { shape: step }
-  scan: "IndexScan\n(users B+Tree)" { shape: step }
-  
-  project -> select: "1. calls next()"
-  select -> scan: "2. calls next()"
-  scan -> select: "3. yields Tuple\n{id: 11, name: 'Alice'}" { style.animated: true; style.stroke: "#555" }
-  select -> project: "4. yields Tuple\n{id: 11, name: 'Alice'}" { style.animated: true; style.stroke: "#555" }
-}

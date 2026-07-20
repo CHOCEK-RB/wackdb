@@ -1,0 +1,25 @@
+direction: right
+vars: {
+  d2-config: {
+    theme-id: 301
+  }
+}
+
+title: |md
+  ## Pipeline Flow Example
+  `SELECT name FROM users WHERE id > 10`
+| {
+  shape: text 
+  near: top-center
+  }
+
+project: "Project (name)" { shape: step }
+select: "Select (id > 10)" { shape: step }
+scan: "IndexScan (B+Tree)" { shape: step }
+
+title -> project: { style.stroke: transparent }
+
+project -> select: "1. next()"
+select -> scan: "2. next()"
+scan -> select: "3. yields\n{id:11, name:'Alice'}" { style.animated: true; style.stroke: "#555" }
+select -> project: "4. yields\n{id:11, name:'Alice'}" { style.animated: true; style.stroke: "#555" }

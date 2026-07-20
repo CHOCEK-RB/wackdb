@@ -8,5 +8,5 @@ FROM
     products
     JOIN users ON id = id
 WHERE
-    id < 2;
+    id < 100;
 
