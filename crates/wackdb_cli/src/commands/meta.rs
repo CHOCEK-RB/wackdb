@@ -260,12 +260,27 @@ fn write_demo_tuple<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
     current_page: &mut Option<(usize, wackdb_storage::PageId)>,
 ) -> Result<wackdb_storage::CTID, Box<dyn std::error::Error>> {
     if current_page.is_none() {
-        let (frame_id, page_id) = bpm.new_page(meta.heap_relation_id)?;
-        {
-            let mut page = bpm.write_page(frame_id);
-            page.init();
+        let total_pages = bpm
+            .disk_manager()
+            .get_total_pages(meta.heap_relation_id)
+            .unwrap_or(0);
+        if total_pages > 0 {
+            let last_pid = wackdb_storage::PageId {
+                file_id: meta.heap_relation_id,
+                page_num: total_pages - 1,
+            };
+            if let Ok(frame_id) = bpm.fetch_page(last_pid) {
+                *current_page = Some((frame_id, last_pid));
+            }
         }
-        *current_page = Some((frame_id, page_id));
+        if current_page.is_none() {
+            let (frame_id, page_id) = bpm.new_page(meta.heap_relation_id)?;
+            {
+                let mut page = bpm.write_page(frame_id);
+                page.init();
+            }
+            *current_page = Some((frame_id, page_id));
+        }
     }
 
     let (frame_id, page_id) = current_page.unwrap();

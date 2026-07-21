@@ -293,6 +293,31 @@ fn write_tuple_to_heap<const PAGE_SIZE: usize, D: DiskManager<PAGE_SIZE>>(
     heap_file_id: u32,
     bpm: &BufferPoolManager<PAGE_SIZE, D>,
 ) -> Result<CTID, Box<dyn std::error::Error>> {
+    let total_pages = bpm
+        .disk_manager()
+        .get_total_pages(heap_file_id)
+        .unwrap_or(0);
+    if total_pages > 0 {
+        let last_page_id = wackdb_storage::PageId {
+            file_id: heap_file_id,
+            page_num: total_pages - 1,
+        };
+        if let Ok(frame_id) = bpm.fetch_page(last_page_id) {
+            let slot_idx = {
+                let mut page = bpm.write_page(frame_id);
+                page.insert_record(&tuple.data, 1)
+            };
+            if let Some(idx) = slot_idx {
+                bpm.unpin_page(last_page_id, true)?;
+                return Ok(CTID {
+                    page_id: last_page_id,
+                    slot_idx: idx as u16,
+                });
+            }
+            let _ = bpm.unpin_page(last_page_id, false);
+        }
+    }
+
     let (frame_id, page_id) = bpm.new_page(heap_file_id)?;
     let slot_idx = {
         let mut page = bpm.write_page(frame_id);

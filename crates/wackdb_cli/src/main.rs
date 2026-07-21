@@ -275,13 +275,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         let current_page =
                                             current_pages.entry(table.clone()).or_insert(None);
                                         if current_page.is_none() {
-                                            let (frame_id, page_id) =
-                                                bpm.new_page(meta.heap_relation_id).unwrap();
-                                            {
-                                                let mut page = bpm.write_page(frame_id);
-                                                page.init();
+                                            let total_pages = bpm
+                                                .disk_manager()
+                                                .get_total_pages(meta.heap_relation_id)
+                                                .unwrap_or(0);
+                                            if total_pages > 0 {
+                                                let last_pid = wackdb_storage::PageId {
+                                                    file_id: meta.heap_relation_id,
+                                                    page_num: total_pages - 1,
+                                                };
+                                                if let Ok(frame_id) = bpm.fetch_page(last_pid) {
+                                                    *current_page = Some((frame_id, last_pid));
+                                                }
                                             }
-                                            *current_page = Some((frame_id, page_id));
+                                            if current_page.is_none() {
+                                                let (frame_id, page_id) =
+                                                    bpm.new_page(meta.heap_relation_id).unwrap();
+                                                {
+                                                    let mut page = bpm.write_page(frame_id);
+                                                    page.init();
+                                                }
+                                                *current_page = Some((frame_id, page_id));
+                                            }
                                         }
 
                                         let (frame_id, page_id) = current_page.unwrap();
