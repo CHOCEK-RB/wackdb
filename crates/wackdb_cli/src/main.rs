@@ -555,6 +555,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         "{}",
                                         format!("wackdb ({})> {};", data_dir, stmt).cyan()
                                     );
+                                    let stmt_start = Instant::now();
                                     match process_command(
                                         stmt,
                                         &mut catalog,
@@ -565,6 +566,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         args.verbose,
                                     ) {
                                         Ok(telemetry) => {
+                                            println!("Execution time: {:?}", stmt_start.elapsed());
                                             if let Some(t) = telemetry {
                                                 println!("{}", t);
                                             }
@@ -580,13 +582,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     .red()
                             ),
                         }
-                        continue;
                     }
                     Ok(_) => {}
                     Err(e) => println!("Error: {}", e),
                 }
                 let duration = start.elapsed();
-                println!("Time: {:?}", duration);
+                if line.starts_with(".source ") {
+                    println!("Total .source execution time: {:?}", duration);
+                } else {
+                    println!("Time: {:?}", duration);
+                }
             }
             continue;
         }
