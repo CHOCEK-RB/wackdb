@@ -283,7 +283,7 @@ pub fn parse_sql(raw_sql: &str) -> Result<Ast, String> {
                                 .next_back()
                                 .unwrap_or(left_raw)
                                 .to_string();
-                            let right_col = raw_c[i + len..].trim().to_string();
+                            let right_col = raw_c[i + len..].trim().trim_matches('\'').to_string();
                             where_clause.push(WhereCondition {
                                 left_col,
                                 operator: op,
@@ -322,7 +322,7 @@ pub fn parse_sql(raw_sql: &str) -> Result<Ast, String> {
         let values_str = values_str.trim_start_matches('(').trim_end_matches(')');
         let values = values_str
             .split(',')
-            .map(|s| s.trim().to_string())
+            .map(|s| s.trim().trim_matches('\'').to_string())
             .collect();
         return Ok(Ast::Insert { table, values });
     }
@@ -448,7 +448,7 @@ pub fn parse_sql(raw_sql: &str) -> Result<Ast, String> {
 
                 if let Some((i, len, op)) = op_idx {
                     let left_col = raw_c[..i].trim().to_string();
-                    let right_col = raw_c[i + len..].trim().to_string();
+                    let right_col = raw_c[i + len..].trim().trim_matches('\'').to_string();
                     where_clause.push(WhereCondition {
                         left_col,
                         operator: op,
